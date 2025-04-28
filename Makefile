@@ -35,5 +35,5 @@ all: $(outfiles)
 	$(MAKE) $(MAKEFLAGS) -f cpp.mk
 	$(CXX) $(FLAGS) $(COUT) $(CXXOUT) -shared -o $(OUTFILE) $(LIBS)
 ifeq ($(OS),Windows_NT)
-	$(shell $(WINDOWS_SHELL) ./generateCompileCommands.ps1)
+	$(WINDOWS_SHELL) ./scripts/generateCompileCommands.ps1
 endif

@@ -1,3 +1,4 @@
 dist
 windowsHeaders
 windowsLibs
+compile_commands.json

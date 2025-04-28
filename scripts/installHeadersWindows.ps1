@@ -27,15 +27,23 @@ function mktempName {
 
 [System.Runtime.InteropServices.Architecture] $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
 [String] $platformStr;
-if (Test-Path .\..\windowsHeaders) {
+[String] $headersPath = Join-Path $PSScriptRoot ".." "windowsHeaders";
+[String] $libsPath = Join-Path $PSScriptRoot ".." "windowsLibs";
+# module paths
+[String] $spdlogPath = Join-Path $PSScriptRoot ".." "spdlog";
+if (Test-Path $headersPath) {
     throw "Headers already installed";
 }
-elseif (Test-Path .\..\windowsLibs) {
+elseif (Test-Path $libsPath) {
     throw "Libs already installed";
 }
 elseif (Test-Path .\..\detours) {
     throw "Detours already downloaded";
 }
+elseif (Test-Path $spdlogPath) {
+    throw "spdlog already downloaded";
+}
+
 switch ($arch) {
     "Arm64" {
         $platformStr = "windowsarm64";
@@ -59,8 +67,8 @@ try {
         throw "Curl failed"
     }
     New-Item -ItemType Directory -Path .\..\cef_build_temp -ErrorAction Stop
-    New-Item -ItemType Directory -Path .\..\windowsHeaders -ErrorAction Stop
-    New-Item -ItemType Directory -Path .\..\windowsLibs -ErrorAction Stop
+    New-Item -ItemType Directory -Path $headersPath -ErrorAction Stop
+    New-Item -ItemType Directory -Path $libsPath -ErrorAction Stop
     # Windows tar is painfully slow
     # i was able to install a multi threaded version of bzip and extract it and by the time i was done, it was still extracting
     # it took 35 minutes in the time it took pbzip2 18 seconds
@@ -74,9 +82,9 @@ try {
         & $tar -v --directory ./../cef_build_temp/ --file $tempfile --strip-components 1 --bzip2 --extract
     }
     Write-Output "Copying headers and libcef"
-    Copy-Item -Path .\..\cef_build_temp\include\* -Destination .\..\windowsHeaders -Recurse
-    Copy-Item -Path .\..\cef_build_temp\Release\* -Destination .\..\windowsLibs -Recurse
-    New-Item -Type SymbolicLink -Path .\..\windowsHeaders\include -Value .
+    Copy-Item -Path .\..\cef_build_temp\include\* -Destination $headersPath -Recurse
+    Copy-Item -Path .\..\cef_build_temp\Release\* -Destination $libsPath -Recurse
+    New-Item -Type SymbolicLink -Path $headersPath\include -Value .
     Write-Output "Finished writing headers and libcef"
     Write-Output "Starting build of libcef_dll_wrapper"
     try {
@@ -87,7 +95,7 @@ try {
         }
         cmake -G "Unix Makefiles" -B dist -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release -DCMAKE_MT=llvm-mt
         make -j -C dist libcef_dll_wrapper
-        Copy-Item -Path .\dist\libcef_dll_wrapper\libcef_dll_wrapper.lib ..\windowsLibs
+        Copy-Item -Path .\dist\libcef_dll_wrapper\libcef_dll_wrapper.lib $libsPath
         Write-Output "Build libcef_dll_wrapper"
     }
     finally {
@@ -125,10 +133,44 @@ try {
     }
     $outpath = $maybeoutdir[0].FullName
     Pop-Location
-    Copy-Item -Path $outpath\* -Destination .\..\windowsLibs
-    Copy-Item -Path $DetoursSourceDir\*.h -Destination .\..\windowsHeaders
+    Copy-Item -Path $outpath\* -Destination $libsPath
+    Copy-Item -Path $DetoursSourceDir\*.h -Destination $headersPath
 }
 finally {
     Pop-Location
     Remove-Item -Recurse -Force $(Join-Path $PSScriptRoot "..\detours")
+}
+
+[String] $spdlogHash = "548b264254b7cbbf68f9003315ea958edacb91e5";
+Push-Location $PSScriptRoot
+Write-Output "Starting build of spdlog"
+try {
+    git clone --depth 1 --progress https://github.com/gabime/spdlog.git $spdlogPath
+    Write-Output "spdlog cloned successfully"
+    Push-Location $spdlogPath
+    try {
+        git fetch origin $spdlogHash
+        git checkout --detach $spdlogHash
+        Write-Output "spdlog checked out successfully"
+        cmake -G "Unix Makefiles" -B build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release
+        make -j -C build spdlog
+        [String] $outfile = (Join-Path $spdlogPath "build" "spdlog.lib")
+        if (-not (Test-Path $outfile)) {
+            throw "spdlog.lib not found"
+        }
+        Copy-Item -Path $outfile -Destination $libsPath
+        Write-Output "spdlog built successfully"
+        Copy-Item -Path $spdlogPath\include\* -Destination $headersPath -Recurse
+        Write-Output "spdlog headers copied successfully"
+    } catch {
+        Write-Output $_
+        throw "Failed to clone spdlog"
+    } finally {
+        Pop-Location
+        Remove-Item -Recurse -Force $spdlogPath
+    }
+    Write-Output "Finished building spdlog"
+}
+finally {
+    Pop-Location
 }
