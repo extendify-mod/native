@@ -2,3 +2,6 @@ dist
 windowsHeaders
 windowsLibs
 compile_commands.json
+build
+.cache
+deps/cef

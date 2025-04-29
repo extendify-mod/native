@@ -1,7 +1,8 @@
-#include <stdint.h>
 #ifdef _WIN32
 #include <windows.h>
 #endif
+#include <spdlog/spdlog.h>
+#include <stdint.h>
 
 enum Status {
   NOT_STARTED,
@@ -20,6 +21,7 @@ Status runStop() {}
 
 #if defined(_WIN32)
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
+	spdlog::log(spdlog::level::err, "TEST");
 	Status ret = Status::NOT_STARTED;
   switch (fdwReason) {
   case DLL_PROCESS_ATTACH:
