@@ -2,23 +2,23 @@ include(FindPackageHandleStandardArgs)
 include(ExternalProject)
 
 if(CMAKE_GENERATOR MATCHES "Ninja") 
-    set(CEF_BUILD_CMD "ninja -C build libcef_dll_wrapper")
-    set(CEF_GENERATOR "Ninja")
+    set(CEF_BUILD_CMD ninja -C build libcef_dll_wrapper)
+    set(CEF_GENERATOR Ninja)
 elseif(CMAKE_GENERATOR MATCHES "Unix Makefiles")
-    set(CEF_BUILD_CMD "make -j -C build libcef_dll_wrapper")
+    set(CEF_BUILD_CMD make -j -C build libcef_dll_wrapper)
     set(CEF_GENERATOR "Unix Makefiles")
 else()
-    message(FATAL_ERROR "Only make and Ninja are supported")
+    message(ERROR "Only make and Ninja are supported, defaulting to Makefiles")
+    set(CEF_BUILD_CMD make -j -C build libcef_dll_wrapper)
+    set(CEF_GENERATOR "Unix Makefiles")
 endif()
 
 ExternalProject_Add(
     libcef_dll_wrapper
     SOURCE_DIR ${PROJECT_SOURCE_DIR}/deps/cef
     DOWNLOAD_EXTRACT_TIMESTAMP FALSE
-    CONFIGURE_COMMAND cmake -GNinja -B build -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER=clang-cl
-    CMAKE_ARGS -GNinja -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER=clang-cl
-    # CMAKE_ARGS "-B build -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl"
-    BUILD_COMMAND ninja -C build libcef_dll_wrapper
+    CONFIGURE_COMMAND cmake -G${CEF_GENERATOR} -B build -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER=clang-cl
+    BUILD_COMMAND ${CEF_BUILD_CMD}
     BUILD_IN_SOURCE TRUE
     INSTALL_COMMAND ""
 )
