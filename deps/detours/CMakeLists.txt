@@ -42,10 +42,12 @@ set (hdrs
 
 set_property (SOURCE Detours/src/uimports.cpp APPEND PROPERTY HEADER_FILE_ONLY true)
 
-if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+if(CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64")
 	add_definitions(-D_AMD64_)
-else()
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64")
 	add_definitions(-D_X86_)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64")
+	add_definitions(-D_ARM64_)
 endif()
 
 add_library(${PROJECT_NAME} STATIC ${hdrs} ${srcs})
