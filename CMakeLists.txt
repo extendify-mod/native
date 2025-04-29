@@ -50,6 +50,9 @@ FetchContent_Populate(cef)
 find_package(spdlog REQUIRED)
 find_package(cef REQUIRED)
 find_package(cef_dll_wrapper REQUIRED)
+if(WIN32)
+    find_package(detours REQUIRED)
+endif()
 # Create a shared library
 add_library(extendify SHARED ${SOURCES})
 
@@ -57,6 +60,9 @@ add_library(extendify SHARED ${SOURCES})
 target_link_libraries(extendify PRIVATE spdlog)
 # target_link_libraries(extendify PRIVATE cef::libcef_dll_wrapper)
 target_link_libraries(extendify PUBLIC cef::libcef)
+if(WIN32)
+    target_link_libraries(extendify PRIVATE detours)
+endif()
 
 # Specify the include directories if needed
 target_include_directories(extendify PRIVATE "${SRC_DIR}")
