@@ -1,3 +1,6 @@
 [submodule "spdlog"]
 	path = deps/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "detours"]
+	path = deps/detours/detours
+	url = https://github.com/microsoft/Detours.git
