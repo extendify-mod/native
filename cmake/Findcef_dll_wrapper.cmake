@@ -59,20 +59,19 @@ if(NOT cef_dll_wrapper_FOUND)
         cef_dll_wrapper
         SOURCE_DIR ${cef_dll_wrapper_SOURCE_DIR}
         DOWNLOAD_EXTRACT_TIMESTAMP FALSE
-        CONFIGURE_COMMAND cmake -G${CEF_GENERATOR} -B ${cef_dll_wrapper_BINARY_DIR} -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DCMAKE_MT=llvm-mt
+        CONFIGURE_COMMAND cmake -G${CEF_GENERATOR} -B ${cef_dll_wrapper_BINARY_DIR} -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DCEF_RUNTIME_LIBRARY_FLAG=/MD
         BUILD_COMMAND ${CEF_BUILD_CMD}
         BUILD_IN_SOURCE TRUE
         INSTALL_COMMAND ""
+        BUILD_BYPRODUCTS "${cef_dll_wrapper_BINARY_DIR}/libcef_dll_wrapper/libcef_dll_wrapper.lib"
     )
     set(cef_dll_wrapper_FOUND TRUE)
     set(cef_dll_wrapper_LIBRARY "${cef_dll_wrapper_BINARY_DIR}/libcef_dll_wrapper/libcef_dll_wrapper.lib")
     set(cef_dll_wrapper_INCLUDE_DIR "${cef_dll_wrapper_SOURCE_DIR}/include")
 endif()
-find_package_handle_standard_args(cef_dll_wrapper REQUIRED_VARS cef_dll_wrapper_LIBRARY cef_dll_wrapper_INCLUDE_DIR)
-mark_as_advanced(cef_dll_wrapper_LIBRARY)
-mark_as_advanced(cef_dll_wrapper_INCLUDE_DIR)
+# find_package_handle_standard_args(cef_dll_wrapper REQUIRED_VARS cef_dll_wrapper_LIBRARY cef_dll_wrapper_INCLUDE_DIR)
 
-add_library(cef::libcef_dll_wrapper SHARED IMPORTED)
+add_library(cef::libcef_dll_wrapper STATIC IMPORTED)
 set_property(TARGET cef::libcef_dll_wrapper PROPERTY IMPORTED_LOCATION "${cef_dll_wrapper_LIBRARY}")
-set_property(TARGET cef::libcef_dll_wrapper PROPERTY IMPORTED_IMPLIB "${cef_dll_wrapper_LIBRARY}")
+# set_property(TARGET cef::libcef_dll_wrapper PROPERTY IMPORTED_IMPLIB "${cef_dll_wrapper_LIBRARY}")
 target_include_directories(cef::libcef_dll_wrapper INTERFACE "${cef_dll_wrapper_INCLUDE_DIR}")

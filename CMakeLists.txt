@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.31)
 
 # Project name
 project(extendify LANGUAGES CXX C)
@@ -30,11 +30,11 @@ add_library(extendify SHARED ${SOURCES})
 
 # Link the library against spdlog
 target_link_libraries(extendify PRIVATE spdlog)
-target_link_libraries(extendify PRIVATE cef::libcef_dll_wrapper)
+target_link_libraries(extendify PUBLIC cef::libcef_dll_wrapper)
 target_link_libraries(extendify PUBLIC libcef::libcef)
 if(WIN32)
     target_link_libraries(extendify PRIVATE detours)
 endif()
-
+target_compile_options(extendify PUBLIC -gdwarf)
 # Specify the include directories if needed
 target_include_directories(extendify PRIVATE "${SRC_DIR}")
