@@ -51,3 +51,16 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64")
 endif()
 
 add_library(${PROJECT_NAME} STATIC ${hdrs} ${srcs})
+function(target_include_files target mode)
+    string(MD5 dir "${ARGN}")
+    set(dir ${PROJECT_BINARY_DIR}/${dir})
+    file(MAKE_DIRECTORY ${dir})
+    foreach(i IN LISTS ARGN)
+       # TODO: replace with build-time generation
+	   message(STATUS "Copying ${i} to ${dir}")
+        configure_file(${i} ${dir} COPYONLY)
+    endforeach()
+    target_include_directories(${target} ${mode} ${dir})
+endfunction()
+
+target_include_files(${PROJECT_NAME} PUBLIC Detours/src/detours.h Detours/src/detver.h)
