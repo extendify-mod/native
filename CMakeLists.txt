@@ -30,16 +30,12 @@ add_library(extendify SHARED ${SOURCES})
 
 # Link the library against spdlog
 target_link_libraries(extendify PRIVATE spdlog)
-target_link_libraries(extendify PUBLIC cef::libcef_dll_wrapper)
-target_link_libraries(extendify PUBLIC libcef::libcef)
+target_link_libraries(extendify PUBLIC libcef_dll_wrapper)
+target_link_libraries(extendify PUBLIC libcef)
 if(WIN32)
     target_link_libraries(extendify PRIVATE detours)
 endif()
 
-if(WIN32)
-    target_compile_options(extendify PUBLIC -Xlinker /debug:dwarf)
-else()
-    target_compile_options(extendify PUBLIC -gdwarf)
-endif()
+target_compile_options(extendify PUBLIC -gdwarf)
 # Specify the include directories if needed
 target_include_directories(extendify PRIVATE "${SRC_DIR}")
