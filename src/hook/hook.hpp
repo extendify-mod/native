@@ -1,8 +1,8 @@
-#include "log/log.hpp"
+#include "log/Logger.hpp"
 
 namespace Extendify {
 	namespace hook {
-		extern log::logger logger;
+		extern log::Logger logger;
 		long hookFunction(void* orig, void* hookFunc);
 		long unhookFunction(void* orig, void* hookFunc);
 	} // namespace hook

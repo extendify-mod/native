@@ -6,10 +6,11 @@
 #include <string>
 #include <winerror.h>
 
-long Extendify::hook::hookFunction(void* orig, void* hookFunc) {
-	long ret;
+using namespace Extendify;
+
+long hook::hookFunction(void* orig, void* hookFunc) {
 	std::string msg;
-	ret = DetourTransactionBegin();
+	long ret = DetourTransactionBegin();
 	if (ret != NO_ERROR) {
 		switch (ret) {
 			case ERROR_INVALID_OPERATION:
@@ -21,6 +22,8 @@ long Extendify::hook::hookFunction(void* orig, void* hookFunc) {
 				goto err;
 		}
 	}
+	return 0;
 err:
-
+	hook::logger.error("Error while hooking function: {}", msg);
+	return ret;
 }
