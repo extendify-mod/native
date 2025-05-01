@@ -36,6 +36,5 @@ if(WIN32)
     target_link_libraries(extendify PRIVATE detours)
 endif()
 
+set_property(TARGET extendify PROPERTY CXX_STANDARD 23)
 target_compile_options(extendify PUBLIC -gdwarf)
-# Specify the include directories if needed
-target_include_directories(extendify PRIVATE "${SRC_DIR}")
