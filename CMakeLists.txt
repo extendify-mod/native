@@ -35,6 +35,11 @@ target_link_libraries(extendify PUBLIC libcef::libcef)
 if(WIN32)
     target_link_libraries(extendify PRIVATE detours)
 endif()
-target_compile_options(extendify PUBLIC -gdwarf)
+
+if(WIN32)
+    target_compile_options(extendify PUBLIC -Xlinker /debug:dwarf)
+else()
+    target_compile_options(extendify PUBLIC -gdwarf)
+endif()
 # Specify the include directories if needed
 target_include_directories(extendify PRIVATE "${SRC_DIR}")
