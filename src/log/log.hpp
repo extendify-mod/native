@@ -6,5 +6,5 @@
 namespace Extendify {
 	namespace log { } // namespace log
 
-	extern log::Logger logger();
+	extern log::Logger logger;
 }; // namespace Extendify

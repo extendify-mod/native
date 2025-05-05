@@ -2,6 +2,6 @@
 
 #include "Logger.hpp"
 
-#include <spdlog/logger.h>
-
-using namespace Extendify;
+namespace Extendify {
+	log::Logger logger({"Extendify"});
+}

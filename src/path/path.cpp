@@ -3,27 +3,30 @@
 #include <filesystem>
 
 using namespace Extendify;
+namespace fs = std::filesystem;
+log::Logger path::logger({"Extendify", "path"});
 
-std::filesystem::path path::getBaseConfigDir() {
-	return path::getBaseConfigDir(false);
+fs::path path::getBaseConfigDir() {
+	return getBaseConfigDir(false);
 }
 
-std::filesystem::path path::getBaseConfigDir(bool createIfNeeded) {
-	char* xdgConfigEnv = std::getenv("XDG_CONFIG_HOME");
-	if (xdgConfigEnv) {
-		return std::filesystem::path(xdgConfigEnv) / "extendify";
+fs::path path::getBaseConfigDir(bool createIfNeeded) {
+	std::optional<fs::path> ret;
+	if (const auto xdgConfigEnv = std::getenv("XDG_CONFIG_HOME")) {
+		ret = fs::path(xdgConfigEnv) / "extendify";
 	}
-	char* homePath = std::getenv("HOME");
-	if (homePath) {
-		return std::filesystem::path(homePath) / ".config" / "extendify";
+	if (const auto homePath = std::getenv("HOME")) {
+		ret = fs::path(homePath) / ".config" / "extendify";
 	}
+ensureExists:
+	logger.logAndThrow("Error Getting base path, both $HOME and $XDG_CONFIG_DIR are not set");
 
 }
 
-std::filesystem::path path::getConfigFilePath() {
-	return path::getConfigFilePath(false);
+fs::path path::getConfigFilePath() {
+	return getConfigFilePath(false);
 }
 
-std::filesystem::path path::getLogDir() {
-	return path::getLogDir(false);
+fs::path path::getLogDir() {
+	return getLogDir(false);
 }

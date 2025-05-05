@@ -1,7 +1,10 @@
 #pragma once
+#include "log/Logger.hpp"
+
 #include <filesystem>
 
 namespace Extendify::path {
+	extern log::Logger logger;
 	std::filesystem::path getBaseConfigDir();
 	std::filesystem::path getBaseConfigDir(bool createIfNeeded);
 	std::filesystem::path getConfigFilePath();
