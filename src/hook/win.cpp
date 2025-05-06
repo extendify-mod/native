@@ -1,3 +1,4 @@
+#ifdef _WIN32
 #include "hook.hpp"
 
 #include <windows.h>
@@ -27,3 +28,5 @@ err:
 	hook::logger.error("Error while hooking function: {}", msg);
 	return ret;
 }
+
+#endif

@@ -2,14 +2,15 @@
 
 #include <iterator>
 #include <string>
+#include <algorithm>
 
 namespace Extendify::util::string {
-	template<std::indirectly_readable T>
-	std::string join(T strings, const std::string& delimiter) {
+	template <std::indirectly_readable T>
+	std::string join(T begin, T end, const std::string& delimiter) {
 		std::string ret;
 
-		for (const auto& str : strings) {
-			ret += str;
+		for (; begin != end; ++begin) {
+			ret += *begin;
 			ret += delimiter;
 		}
 

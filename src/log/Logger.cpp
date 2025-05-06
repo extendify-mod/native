@@ -64,7 +64,7 @@ void Logger::logAndThrow(spdlog::level::level_enum lvl, spdlog::string_view_t ms
 #pragma endregion
 
 std::string Logger::makeFullLoggerName(const std::initializer_list<std::string>& names) {
-	return util::string::join(names.begin(), "/");
+	return util::string::join(names.begin(), names.end(), "/");
 }
 
 std::shared_ptr<spdlog::sinks::sink> Logger::getDefaultFileSink() {
