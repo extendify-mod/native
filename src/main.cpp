@@ -1,9 +1,8 @@
+#include "log/log.hpp"
+
 #ifdef _WIN32
 #include <windows.h>
 #endif
-#include <cef_version_info.h>
-#include <spdlog/spdlog.h>
-#include <stdint.h>
 
 enum Status {
 	NOT_STARTED,
@@ -12,18 +11,15 @@ enum Status {
 };
 
 Status runStart() {
-	return OK;
-	;
+	return ERR;
 }
 
 Status runStop() {
 	return OK;
-	;
 }
 
 #if defined(_WIN32)
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
-	spdlog::log(spdlog::level::err, "TEST");
 	Status ret = Status::NOT_STARTED;
 	cef_version_info(0);
 	switch (fdwReason) {
@@ -41,4 +37,18 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 	return TRUE;
 }
 #elif defined(__linux__)
+__attribute__((constructor)) void ctor() {
+	const Status ret = runStart();
+	if (ret != OK) {
+		Extendify::logger.error("Failed to runStart");
+	}
+}
+
+__attribute__((constructor)) void dtor() {
+	const Status ret = runStop();
+	if (ret != OK) {
+		Extendify::logger.error("Failed to runStop");
+	}
+	return;
+}
 #endif
