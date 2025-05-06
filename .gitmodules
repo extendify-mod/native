@@ -4,3 +4,6 @@
 [submodule "detours"]
 	path = deps/detours/detours
 	url = https://github.com/microsoft/Detours.git
+[submodule "dobby"]
+	path = deps/dobby
+	url = https://github.com/sadan4/Dobby.git
