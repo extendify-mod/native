@@ -24,10 +24,9 @@
 	ret name(__VA_ARGS__::spdlog::source_loc loc, ::spdlog::level::level_enum lvl, const T& msg)
 #define CREATE_LOG_OVERRIDE6(name, ret, ...)                                                                     \
 	ret name(__VA_ARGS__::spdlog::source_loc loc, ::spdlog::level::level_enum lvl, ::spdlog::string_view_t msg)
-// #define CREATE_LOG_OVERRIDE7(name, ret, ...)                                                \
-//  	ret name(__VA_ARGS__::spdlog::log_clock::time_point log_time, ::spdlog::source_loc loc, \
-//  			 ::spdlog::level::level_enum lvl, ::spdlog::string_view_t msg)
-#define CREATE_LOG_OVERRIDE7(name, ret, ...) CREATE_LOG_OVERRIDE6(name, ret, __VA_ARGS__ ::spdlog::log_clock::time_point log_time,)
+#define CREATE_LOG_OVERRIDE7(name, ret, ...)                                                \
+ 	ret name(__VA_ARGS__::spdlog::log_clock::time_point log_time, ::spdlog::source_loc loc, \
+ 			 ::spdlog::level::level_enum lvl, ::spdlog::string_view_t msg)
 #define CREATE_LOG_OVERRIDE8(name, ret, ...)                                          \
 	ret name(__VA_ARGS__::spdlog::level::level_enum lvl, ::spdlog::string_view_t msg)
 

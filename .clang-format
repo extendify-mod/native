@@ -6,7 +6,7 @@ AlignConsecutiveMacros:
   AcrossEmptyLines: false
   AcrossComments:  false
   AlignCompound:   false
-  AlignFunctionDeclarations: false
+#  AlignFunctionDeclarations: false
   AlignFunctionPointers: false
   PadOperators:    false
 AlignEscapedNewlines: LeftWithLastLine
@@ -65,7 +65,7 @@ IncludeIsMainSourceRegex: ''
 IndentAccessModifiers: false
 IndentCaseBlocks: false
 IndentCaseLabels: true
-IndentExportBlock: true
+#IndentExportBlock: true
 IndentExternBlock: NoIndent
 IndentGotoLabels: false
 IndentPPDirectives: None
@@ -87,7 +87,7 @@ PackConstructorInitializers: Never
 # What do these mean?
 PenaltyBreakAssignment: 2
 PenaltyBreakBeforeFirstCallParameter: 19
-PenaltyBreakBeforeMemberAccess: 150
+#PenaltyBreakBeforeMemberAccess: 150
 PenaltyBreakComment: 300
 PenaltyBreakFirstLessLess: 120
 PenaltyBreakOpenParenthesis: 0
@@ -99,7 +99,7 @@ PenaltyIndentedWhitespace: 0
 PenaltyReturnTypeOnItsOwnLine: 60
 PointerAlignment: Left
 PPIndentWidth:   -1
-RemoveEmptyLinesInUnwrappedLines: true
+#RemoveEmptyLinesInUnwrappedLines: true
 SeparateDefinitionBlocks: Always
 ShortNamespaceLines: 0
 SortIncludes:    CaseInsensitive
@@ -117,6 +117,6 @@ SpacesInLineCommentPrefix:
 Standard:        Latest
 TabWidth:        4
 UseTab:          Always
-WrapNamespaceBodyWithEmptyLines: Never
+#WrapNamespaceBodyWithEmptyLines: Never
 ...
 

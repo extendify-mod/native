@@ -9,6 +9,7 @@
       <file path="$PROJECT_DIR$/deps/detours" />
       <file path="$PROJECT_DIR$/deps/dobby" />
       <file path="$PROJECT_DIR$/deps/spdlog" />
+      <file path="$PROJECT_DIR$/deps/wrapper" />
     </libraryRoots>
   </component>
 </project>
