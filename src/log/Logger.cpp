@@ -37,32 +37,6 @@ void Logger::addSink(const std::shared_ptr<spdlog::sinks::sink>& sink) {
 	sinks().push_back(sink);
 }
 
-#pragma region log and throw
-
-void Logger::logAndThrow(spdlog::log_clock::time_point log_time, spdlog::source_loc loc, spdlog::level::level_enum lvl,
-						 spdlog::string_view_t msg) {
-	log(log_time, loc, lvl, msg);
-	flush();
-
-	throw std::runtime_error(std::string(msg.data(), msg.size()));
-}
-
-void Logger::logAndThrow(spdlog::source_loc loc, spdlog::level::level_enum lvl, spdlog::string_view_t msg) {
-	log(loc, lvl, msg);
-	flush();
-
-	throw std::runtime_error(std::string(msg.data(), msg.size()));
-}
-
-void Logger::logAndThrow(spdlog::level::level_enum lvl, spdlog::string_view_t msg) {
-	log(lvl, msg);
-	flush();
-
-	throw std::runtime_error(std::string(msg.data(), msg.size()));
-}
-
-#pragma endregion
-
 std::string Logger::makeFullLoggerName(const std::initializer_list<std::string>& names) {
 	return util::string::join(names.begin(), names.end(), "/");
 }

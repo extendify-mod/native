@@ -1,4 +1,5 @@
 #include "log/log.hpp"
+#include <cef_version_info.h>
 
 #ifdef _WIN32
 #include <windows.h>

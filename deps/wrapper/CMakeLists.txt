@@ -4,6 +4,7 @@ project(extendify_wrapper)
 
 if (WIN32)
     list(APPEND srcs src/win32.c)
+    list(APPEND CMAKE_C_FLAGS "-Xlinker /export:DetourFinishHelperProcess,@1,NONAME")
 elseif (LINUX)
     list(APPEND srcs src/linux.c)
 else ()

@@ -1,58 +1,50 @@
-#include <dlfcn.h>
+#include <windows.h>
+//
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
-static const char *ENV_VAR_NAME = "EXTENDIFY_LIB_PATH";
+static const char* ENV_VAR_NAME = "EXTENDIFY_LIB_PATH";
 
-static const char *SPOTIFY_NAME = ".spotify-wrapped";
+static const char* SPOTIFY_NAME = "Spotify.exe";
 
-int __attribute__((constructor)) start() {
-	const char *path = getenv(ENV_VAR_NAME);
-	if (path == NULL) {
+VOID CALLBACK DetourFinishHelperProcess(_In_ HWND,
+                                        _In_ HINSTANCE,
+                                        _In_ LPSTR,
+                                        _In_ INT) {
+
+};
+
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
+	if (fdwReason != DLL_PROCESS_ATTACH)
+		return TRUE;
+	const char* _path = getenv(ENV_VAR_NAME);
+	if (_path == NULL) {
 		fprintf(stderr, "Environment variable %s not set\n", ENV_VAR_NAME);
 		return 1;
 	}
-	FILE *fd = fopen("/proc/self/cmdline", "r");
-	if (fd == NULL) {
-		fprintf(stderr, "Failed to open /proc/self/cmdline");
+	char* path = malloc(strlen(_path));
+	if (path == NULL) {
+		fprintf(stderr, "Malloc Failed");
 		return 1;
 	}
+	memcpy(path, _path, strlen(_path));
 
-	char cmdline[4096];
-
-	ssize_t len = fread(cmdline, sizeof(char), sizeof(cmdline) - 1, fd);
-
-	cmdline[len] = '\0';
-
-	fclose(fd);
-
-	if (strcmp(cmdline, "/proc/self/exe") == 0) {
-		ssize_t numRead = readlink("/proc/self/exe", cmdline, 4096);
-		if (numRead == -1) {
-			fprintf(stderr, "Failed to read /proc/self/exe\n");
-			return 1;
-		}
-		if (numRead == 4096) {
-			fprintf(stderr, "Path too long\n");
-			return 1;
-		}
+	for (char* c = path; *c; c++) {
+		*c = tolower(*c); // NOLINT(*-narrowing-conversions)
 	}
+
+	char* cmdline = GetCommandLineA();
 
 	if (strstr(cmdline, SPOTIFY_NAME) != NULL) {
 		fprintf(stderr, "Command line contains %s\n", SPOTIFY_NAME);
 		fprintf(stderr, "Loading libsadan.so from %s\n", path);
-		dlopen(path, RTLD_NOW);
+		LoadLibraryA(path);
 	} else {
 		fprintf(stderr, "Command line does not contain %s\nNot loading libsadan.\n",
-				SPOTIFY_NAME);
+		        SPOTIFY_NAME);
 		fprintf(stderr, "cmdline is: %s\n", cmdline);
 	}
-
-	return 0;
-}
-
-int __attribute__((destructor)) stop() {
+	free(path);
 	return 0;
 }

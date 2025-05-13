@@ -19,7 +19,8 @@ fs::path path::getBaseConfigDir(bool createIfNeeded) {
 		ret = fs::path(homePath) / ".config" / "extendify";
 	}
 ensureExists:
-	logger.logAndThrow("Error Getting base path, both $HOME and $XDG_CONFIG_DIR are not set");
+	logger.error("Error getting base path, both $HOME and $XDG_CONFIG_DIR are not set");
+	throw std::runtime_error("Error getting base path, both $HOME and $XDG_CONFIG_DIR are not set");
 
 }
 
