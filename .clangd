@@ -1,0 +1,5 @@
+---
+If:
+    PathExclude: [src/.*, deps/wrapper/*]
+Diagnostics:
+    Suppress: '*'

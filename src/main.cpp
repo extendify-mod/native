@@ -1,9 +1,12 @@
 #include "log/log.hpp"
+#include "api/entrypoint.hpp"
 #include <cef_version_info.h>
 
 #ifdef _WIN32
 #include <windows.h>
 #endif
+
+using namespace Extendify;
 
 enum Status {
 	NOT_STARTED,
@@ -12,7 +15,15 @@ enum Status {
 };
 
 Status runStart() {
-	return ERR;
+	logger.trace("runStart started");
+	try {
+		api::entrypoint::init();
+	} catch (const std::exception& e) {
+		logger.error("Failed to runStart: {}", e.what());
+		return ERR;
+	}
+	logger.trace("runStart finished");
+	return OK;
 }
 
 Status runStop() {
@@ -22,7 +33,6 @@ Status runStop() {
 #if defined(_WIN32)
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 	Status ret = Status::NOT_STARTED;
-	cef_version_info(0);
 	switch (fdwReason) {
 		case DLL_PROCESS_ATTACH:
 			ret = runStart();

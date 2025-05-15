@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.31)
-
 # Project name
 project(extendify LANGUAGES CXX C)
 
@@ -44,7 +43,14 @@ endif ()
 # Specify the include directories if needed
 target_include_directories(extendify PRIVATE "${SRC_DIR}")
 set_property(TARGET extendify PROPERTY CXX_STANDARD 23)
+include(cmake/compilerChecks.cmake)
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
-else ()
+elseif (SUPPORTS_GDWARF)
     target_compile_options(extendify PUBLIC -gdwarf)
+else ()
+    message(WARNING "-gdwarf is not supported, no debug symbols will be output")
 endif ()
+if(C_GETENV_DEPRECATED)
+    message(STATUS "getenv is deprecated, suppressing")
+    target_compile_definitions(extendify PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()

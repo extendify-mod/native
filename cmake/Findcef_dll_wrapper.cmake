@@ -41,7 +41,7 @@ if (NOT cef_dll_wrapper_FOUND)
                 URL ${CEF_DOWNLOAD_URL}
                 URL_HASH SHA256=${CEF_HASH}
                 DOWNLOAD_EXTRACT_TIMESTAMP FALSE
-                PATCH_COMMAND patch ./CMakeLists.txt "${CMAKE_CURRENT_LIST_DIR}/noTests.patch"
+                PATCH_COMMAND patch compilerChecks.cmake "${CMAKE_CURRENT_LIST_DIR}/noTests.patch"
         )
         fetchcontent_makeavailable(cef_dll_wrapper)
     elseif (WIN32)

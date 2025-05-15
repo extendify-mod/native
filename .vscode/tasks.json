@@ -1,0 +1,22 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "My Task",
+      "command": "make",
+      "type": "shell",
+      "args": ["-j", "-C", "build"],
+      "presentation": {
+        "clear": true,
+        "reveal": "silent",
+        "revealProblems": "onProblem",
+        "echo": true,
+        "group": "build",
+        "showReuseMessage": true,
+        "focus": false,
+        "panel": "shared"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }

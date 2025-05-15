@@ -8,10 +8,10 @@ static const char* ENV_VAR_NAME = "EXTENDIFY_LIB_PATH";
 
 static const char* SPOTIFY_NAME = "Spotify.exe";
 
-VOID CALLBACK DetourFinishHelperProcess(_In_ HWND,
-                                        _In_ HINSTANCE,
-                                        _In_ LPSTR,
-                                        _In_ INT) {
+VOID CALLBACK DetourFinishHelperProcess(_In_ HWND _a,
+                                        _In_ HINSTANCE _b,
+                                        _In_ LPSTR _c,
+                                        _In_ INT _d) {
 
 };
 

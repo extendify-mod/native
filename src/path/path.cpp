@@ -1,6 +1,9 @@
 #include "path.hpp"
 
+#include "config/Config.hpp"
+
 #include <filesystem>
+#include <fstream>
 
 using namespace Extendify;
 namespace fs = std::filesystem;
@@ -14,20 +17,73 @@ fs::path path::getBaseConfigDir(bool createIfNeeded) {
 	std::optional<fs::path> ret;
 	if (const auto xdgConfigEnv = std::getenv("XDG_CONFIG_HOME")) {
 		ret = fs::path(xdgConfigEnv) / "extendify";
-	}
-	if (const auto homePath = std::getenv("HOME")) {
+	} else if (const auto homePath = std::getenv("HOME")) {
 		ret = fs::path(homePath) / ".config" / "extendify";
 	}
 ensureExists:
+	if (ret.has_value()) {
+		if (createIfNeeded) {
+			ensureDir(ret.value());
+		}
+		return ret.value();
+	}
 	logger.error("Error getting base path, both $HOME and $XDG_CONFIG_DIR are not set");
 	throw std::runtime_error("Error getting base path, both $HOME and $XDG_CONFIG_DIR are not set");
-
 }
 
 fs::path path::getConfigFilePath() {
 	return getConfigFilePath(false);
 }
 
+std::filesystem::path path::getConfigFilePath(bool createIfNeeded) {
+	const auto base = getBaseConfigDir(createIfNeeded);
+	auto configFile = base / "config.json";
+	if (createIfNeeded) {
+		ensureFile(configFile, config::defaultConfigJSON);
+	}
+	return configFile;
+}
+
+std::filesystem::path path::getLogDir(bool createIfNeeded) {
+	const auto base = getBaseConfigDir(createIfNeeded);
+	auto logPath = base / "logs";
+	if (createIfNeeded) {
+		ensureDir(logPath);
+	}
+	return logPath;
+}
+
 fs::path path::getLogDir() {
 	return getLogDir(false);
+}
+
+bool path::ensureDir(const std::filesystem::path& path) {
+	if (fs::exists(path)) {
+		logger.debug("Directory {} already exists", path.string());
+		return false;
+	}
+	logger.debug("Creating directory {}", path.string());
+	fs::create_directories(path);
+	return true;
+}
+
+bool path::ensureFile(const std::filesystem::path& path) {
+	return ensureFile(path, "");
+}
+
+bool path::ensureFile(const std::filesystem::path& path, const std::string& defaultContent) {
+	if (fs::exists(path)) {
+		logger.debug("File {} already exists", path.string());
+		return false;
+	}
+	logger.debug("Creating file {}", path.string());
+	std::ofstream stream(path);
+	if (!stream) {
+		logger.error("Error creating file {}", path.string());
+		throw std::runtime_error("Error creating file " + path.string());
+	}
+	if (!defaultContent.empty()) {
+		stream << defaultContent;
+	}
+	return true;
 }
