@@ -80,7 +80,7 @@ if (NOT cef_dll_wrapper_FOUND)
         set(cef_dll_wrapper_LIBRARY "${cef_dll_wrapper_BINARY_DIR}/libcef_dll_wrapper/libcef_dll_wrapper.lib")
     endif ()
 endif ()
-#find_package_handle_standard_args(cef_dll_wrapper REQUIRED_VARS cef_dll_wrapper_LIBRARY)
-#
-#add_library(libcef_dll_wrapper STATIC IMPORTED)
-#set_property(TARGET libcef_dll_wrapper PROPERTY IMPORTED_LOCATION "${cef_dll_wrapper_LIBRARY}")
+find_package_handle_standard_args(cef_dll_wrapper REQUIRED_VARS cef_dll_wrapper_LIBRARY)
+
+add_library(libcef_dll_wrapper STATIC IMPORTED)
+set_property(TARGET libcef_dll_wrapper PROPERTY IMPORTED_LOCATION "${cef_dll_wrapper_LIBRARY}")
