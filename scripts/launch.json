@@ -32,14 +32,14 @@
       "program": "",
       "args": ["--single-process"],
       "stopAtEntry": false,
-      "cwd": "${workspaceRoot}",
+      "cwd": "${workspaceFolder}",
       "windows": {
         "environment": [
           {
             "name": "EXTENDIFY_LIB_PATH",
             "value": "${workspaceFolder}\\build\\extendify.dll"
           }
-        ]
+        ],
       },
       "linux": {
         "environment": [
@@ -63,7 +63,22 @@
           "text": "-gdb-set disassembly-flavor intel",
           "ignoreFailures": true
         }
-      ]
+      ],
+      "preLaunchTask": "Build"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "(lldb) Launch",
+      "program": "",
+      "args": [
+        "--single-process"
+      ],
+      "env": {
+        "EXTENDIFY_LIB_PATH": "${workspaceFolder}\\build\\extendify.dll"
+      },
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Build"
     }
   ]
 }
