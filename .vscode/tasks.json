@@ -33,6 +33,12 @@
         "${workspaceFolder}\\scripts\\injectWrapper.ps1"
       ],
       "problemMatcher": []
+    },
+    {
+      "type": "cmake",
+      "label": "Configure",
+      "command": "configure",
+      "problemMatcher": [],
     }
   ]
 }
