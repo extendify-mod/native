@@ -43,7 +43,7 @@ std::string Logger::makeFullLoggerName(const std::initializer_list<std::string>&
 
 std::shared_ptr<spdlog::sinks::sink> Logger::getDefaultFileSink() {
 	static std::shared_ptr<spdlog::sinks::sink> sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-		(path::getLogDir() / "latest.log").string(), SIZE_MAX, SIZE_MAX, true);
+		(path::getLogDir() / "latest.log").string(), SIZE_MAX - 5000, 200000 /* hardcoded limit in spdlog */, true);
 
 	return sink;
 }

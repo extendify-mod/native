@@ -55,14 +55,15 @@ if(C_GETENV_DEPRECATED)
     target_compile_definitions(extendify PRIVATE _CRT_SECURE_NO_WARNINGS)
 endif()
 
-add_custom_command(TARGET extendify
-        POST_BUILD
+add_custom_target(extendify.copyDeps DEPENDS setdll extendify_wrapper)
+add_custom_command(TARGET extendify.copyDeps
+        PRE_BUILD
         COMMAND
         ${CMAKE_COMMAND} -E copy $<TARGET_FILE:setdll> ${CMAKE_CURRENT_BINARY_DIR}/setdll.exe
 )
-
-add_custom_command(TARGET extendify
-        POST_BUILD
+add_dependencies(extendify extendify.copyDeps)
+add_custom_command(TARGET extendify.copyDeps
+        PRE_BUILD
         COMMAND
         ${CMAKE_COMMAND} -E copy $<TARGET_FILE:extendify_wrapper> ${CMAKE_CURRENT_BINARY_DIR}/extendify_wrapper.dll
 )

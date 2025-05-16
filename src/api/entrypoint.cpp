@@ -18,6 +18,7 @@ static f_ret (*origFunc)(f_args) = cef_initialize;
 static f_ret hookFunc(f_args) {
 
 	logger.trace("in cef_initialize");
+	logger.flush();
 	return origFunc(args, settings, application, windows_sandbox_info);
 }
 

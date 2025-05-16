@@ -23,12 +23,12 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 		fprintf(stderr, "Environment variable %s not set\n", ENV_VAR_NAME);
 		return 1;
 	}
-	char* path = malloc(strlen(_path));
+	char* path = malloc(strlen(_path) + 1);
 	if (path == NULL) {
 		fprintf(stderr, "Malloc Failed");
 		return 1;
 	}
-	memcpy(path, _path, strlen(_path));
+	memcpy(path, _path, strlen(_path) + 1);
 
 	for (char* c = path; *c; c++) {
 		*c = tolower(*c); // NOLINT(*-narrowing-conversions)
@@ -46,5 +46,5 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 		fprintf(stderr, "cmdline is: %s\n", cmdline);
 	}
 	free(path);
-	return 0;
+	return 1;
 }

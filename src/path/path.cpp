@@ -15,12 +15,17 @@ fs::path path::getBaseConfigDir() {
 
 fs::path path::getBaseConfigDir(bool createIfNeeded) {
 	std::optional<fs::path> ret;
+#ifdef __linux__
 	if (const auto xdgConfigEnv = std::getenv("XDG_CONFIG_HOME")) {
 		ret = fs::path(xdgConfigEnv) / "extendify";
 	} else if (const auto homePath = std::getenv("HOME")) {
 		ret = fs::path(homePath) / ".config" / "extendify";
 	}
-ensureExists:
+#elifdef _WIN32
+	if (const auto appData = std::getenv("APPDATA")) {
+		ret = fs::path(appData) / "extendify";
+	}
+#endif
 	if (ret.has_value()) {
 		if (createIfNeeded) {
 			ensureDir(ret.value());

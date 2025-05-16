@@ -6,3 +6,4 @@ build
 .cache
 deps/cef
 cmake-build-debug
+.vscode/launch.json
