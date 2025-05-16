@@ -7,3 +7,4 @@ build
 deps/cef
 cmake-build-debug
 .vscode/launch.json
+.direnv
