@@ -17,11 +17,11 @@ else ()
 endif ()
 # set the download hash
 if (WIN32 AND CEF_ARCH STREQUAL "64")
-    set(CEF_HASH "fcd3e449bc5dcaca81f3056897c90e432e7042a6f38a854f59b45fa5cf2f36bc")
+    set(CEF_HASH "27d0565d64c8706c7f72ac4d1c6a31790cd27bcb")
 elseif (WIN32 AND CEF_ARCH STREQUAL "arm64")
-    set(CEF_HASH "bd4c72ddb97d80f378b1e2ac803f60ed24387da6d2ce0acf38f088af05128714")
+    set(CEF_HASH "")
 elseif (LINUX AND CEF_ARCH STREQUAL "64")
-    set(CEF_HASH "36a0f07c91c43c68a937e766af3b5bc1a0828bb11656cafa9ed49a4dd6c0bae2")
+    set(CEF_HASH "")
 else ()
     set(CEF_HASH "")
     message(ERROR "HASH NOT SET FOR ${CEF_OS}/${CEF_ARCH}")
@@ -32,13 +32,16 @@ find_library(
         NAMES cef
 )
 if (NOT (libcef AND libcef_INCLUDE_DIR))
-    set(CEF_DOWNLOAD_URL "https://cef-builds.spotifycdn.com/cef_binary_135.0.22%2Bg442c600%2Bchromium-135.0.7049.115_${CEF_OS}${CEF_ARCH}.tar.bz2")
+    # go to https://www.spotify.com/us/opensource/, copy correct cef version, run it in this
+    # paste | python -c 'import sys; from urllib.parse import quote; print(quote(sys.stdin.read()))' | tee /dev/stderr | copy
+    set(BUILD_STR "134.3.11%2Bg7c94248%2Bchromium-134.0.6998.178")
+    set(CEF_DOWNLOAD_URL "https://cef-builds.spotifycdn.com/cef_binary_${BUILD_STR}_${CEF_OS}${CEF_ARCH}.tar.bz2")
     cmake_policy(SET CMP0169 OLD)
 
     FetchContent_Declare(
             cef
             URL ${CEF_DOWNLOAD_URL}
-            URL_HASH SHA256=${CEF_HASH}
+            URL_HASH SHA1=${CEF_HASH}
             DOWNLOAD_EXTRACT_TIMESTAMP FALSE
     )
     FetchContent_Populate(cef)
