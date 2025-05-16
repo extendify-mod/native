@@ -64,3 +64,6 @@ function(target_include_files target mode)
 endfunction()
 
 target_include_files(${PROJECT_NAME} PUBLIC Detours/src/detours.h Detours/src/detver.h)
+# setdll.exe, used for patching the import table (like patchelf)
+add_executable(setdll ${CMAKE_CURRENT_LIST_DIR}/detours/samples/setdll/setdll.cpp)
+target_link_libraries(setdll ${PROJECT_NAME})
