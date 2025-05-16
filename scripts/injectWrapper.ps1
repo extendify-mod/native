@@ -27,5 +27,13 @@ $baseConfig = Get-Content -Path $PSScriptRoot\launch.json -Raw | ConvertFrom-Jso
 $baseConfig.configurations | ForEach-Object {
     $_.program = $spotify;
 }
+# use gdb-multiarch for arm64 as normal gdb does not support arm64
+if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) {
+    $baseConfig.configurations | ForEach-Object {
+        if ($_.miDebuggerPath -eq "gdb") {
+            $_.miDebuggerPath = "gdb-multiarch";
+        }
+    }
+}
 ConvertTo-Json -InputObject $baseConfig -Depth 100 | Set-Content -Path $PSScriptRoot\..\.vscode\launch.json -Force;
 Write-Output "Generated vscode launch configuration";

@@ -1,9 +1,15 @@
-#include "log/log.hpp"
 #include "api/entrypoint.hpp"
+#include "log/log.hpp"
+
 #include <cef_version_info.h>
+#include <cstdio>
+#include <iostream>
 
 #ifdef _WIN32
 #include <windows.h>
+
+#include <consoleapi.h>
+
 #endif
 
 using namespace Extendify;
@@ -33,16 +39,17 @@ Status runStop() {
 #if defined(_WIN32)
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 	Status ret = Status::NOT_STARTED;
+	fprintf(stdout, "stdout");
+	fprintf(stderr, "stderr");
 	switch (fdwReason) {
 		case DLL_PROCESS_ATTACH:
 			ret = runStart();
 			break;
-		case DLL_THREAD_ATTACH:
-			break;
 		case DLL_THREAD_DETACH:
 			ret = runStop();
-			break;
+		case DLL_THREAD_ATTACH:
 		case DLL_PROCESS_DETACH:
+		default:
 			break;
 	}
 	return TRUE;

@@ -19,11 +19,18 @@
           "value": "${workspaceFolder}\\build\\extendify.dll"
         }
       ],
-      "console": "integratedTerminal",
+      "console": "internalConsole",
       "symbolOptions": {
         "searchMicrosoftSymbolServer": true
       },
-      "preLaunchTask": "Build"
+      "preLaunchTask": "Build",
+      "logging": {
+        "programOutput": true,
+        "processExit": true,
+        "threadExit": true,
+        "moduleLoad": true,
+        "exceptions": true,
+      }
     },
     {
       "name": "(gdb) Launch",
