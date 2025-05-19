@@ -22,8 +22,10 @@ static f_ret hookFunc(f_args) {
 
 	logger.trace("in cef_initialize");
 	if(!settings->remote_debugging_port) {
-		logger.debug("remote debugging port is not set, setting to 9229");
+		logger.info("remote debugging port is not set, setting to 9229");
 		const_cast<_cef_settings_t*>(settings)->remote_debugging_port = 9229;
+	} else {
+		logger.info("remote debugging port is set to {}", settings->remote_debugging_port);
 	}
 	return origFunc(args, settings, application, windows_sandbox_info);
 }

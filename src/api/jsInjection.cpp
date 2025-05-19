@@ -1,6 +1,7 @@
 #include "jsInjection.hpp"
 
 #include "hook/hook.hpp"
+#include "api.hpp"
 
 #include <capi/cef_v8_capi.h>
 #include <cef_callback.h> // needed because of error in cef_v8.h, must come before it

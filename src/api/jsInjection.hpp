@@ -1,5 +1,4 @@
 #pragma once
-#include "api.hpp"
 
 namespace Extendify::api::jsInjection {
 	void init();
