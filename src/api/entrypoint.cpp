@@ -6,7 +6,7 @@
 
 #include <capi/cef_app_capi.h>
 #include <include/internal/cef_types.h>
-#include <iostream>
+
 using namespace Extendify;
 using namespace api;
 using namespace entrypoint;
