@@ -19,7 +19,7 @@
           "value": "${workspaceFolder}\\build\\extendify.dll"
         }
       ],
-      "console": "internalConsole",
+      "console": "integratedTerminal",
       "symbolOptions": {
         "searchMicrosoftSymbolServer": true
       },
@@ -28,7 +28,7 @@
         "programOutput": true,
         "processExit": true,
         "threadExit": true,
-        "moduleLoad": true,
+        "moduleLoad": false,
         "exceptions": true,
       }
     },
