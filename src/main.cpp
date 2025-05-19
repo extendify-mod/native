@@ -1,9 +1,15 @@
-#include "log/log.hpp"
 #include "api/entrypoint.hpp"
+#include "log/log.hpp"
+
 #include <cef_version_info.h>
+#include <cstdio>
+#include <iostream>
 
 #ifdef _WIN32
 #include <windows.h>
+
+#include <consoleapi.h>
+
 #endif
 
 using namespace Extendify;
@@ -16,6 +22,7 @@ enum Status {
 
 Status runStart() {
 	logger.trace("runStart started");
+
 	try {
 		api::entrypoint::init();
 	} catch (const std::exception& e) {
@@ -37,12 +44,11 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 		case DLL_PROCESS_ATTACH:
 			ret = runStart();
 			break;
-		case DLL_THREAD_ATTACH:
-			break;
 		case DLL_THREAD_DETACH:
 			ret = runStop();
-			break;
+		case DLL_THREAD_ATTACH:
 		case DLL_PROCESS_DETACH:
+		default:
 			break;
 	}
 	return TRUE;

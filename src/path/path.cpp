@@ -1,6 +1,6 @@
 #include "path.hpp"
 
-#include "config/Config.hpp"
+#include "api/settings.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -44,7 +44,7 @@ std::filesystem::path path::getConfigFilePath(bool createIfNeeded) {
 	const auto base = getBaseConfigDir(createIfNeeded);
 	auto configFile = base / "config.json";
 	if (createIfNeeded) {
-		ensureFile(configFile, config::defaultConfigJSON);
+		ensureFile(configFile, api::settings::defaultSettingsJSON);
 	}
 	return configFile;
 }

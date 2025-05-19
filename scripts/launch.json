@@ -23,7 +23,14 @@
       "symbolOptions": {
         "searchMicrosoftSymbolServer": true
       },
-      "preLaunchTask": "Build"
+      "preLaunchTask": "Build",
+      "logging": {
+        "programOutput": true,
+        "processExit": true,
+        "threadExit": true,
+        "moduleLoad": false,
+        "exceptions": true,
+      }
     },
     {
       "name": "(gdb) Launch",
