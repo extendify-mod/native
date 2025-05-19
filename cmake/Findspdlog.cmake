@@ -9,3 +9,5 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(spdlog)
+# needed because libcef_dll_wrapper disables it for sandbox
+target_compile_definitions(spdlog PUBLIC _HAS_ITERATOR_DEBUGGING=0)

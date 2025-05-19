@@ -32,7 +32,7 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/deps/wrapper)
 
 # Link the library against spdlog
 target_link_libraries(extendify PRIVATE spdlog)
-target_link_libraries(extendify PUBLIC libcef_dll_wrapper)
+target_link_libraries(extendify PRIVATE libcef_dll_wrapper)
 target_link_libraries(extendify PUBLIC libcef)
 if (WIN32)
     target_link_libraries(extendify PRIVATE detours)
