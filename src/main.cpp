@@ -22,6 +22,7 @@ enum Status {
 
 Status runStart() {
 	logger.trace("runStart started");
+
 	try {
 		api::entrypoint::init();
 	} catch (const std::exception& e) {
@@ -39,8 +40,6 @@ Status runStop() {
 #if defined(_WIN32)
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 	Status ret = Status::NOT_STARTED;
-	fprintf(stdout, "stdout");
-	fprintf(stderr, "stderr");
 	switch (fdwReason) {
 		case DLL_PROCESS_ATTACH:
 			ret = runStart();

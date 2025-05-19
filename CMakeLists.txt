@@ -54,6 +54,10 @@ if(C_GETENV_DEPRECATED)
     message(STATUS "getenv is deprecated, suppressing")
     target_compile_definitions(extendify PRIVATE _CRT_SECURE_NO_WARNINGS)
 endif()
+if(WIN32_STD_MINMAX_NEEDS_NOMINMAX)
+    message(STATUS "std::min and std::max need NOMINMAX")
+    target_compile_definitions(extendify PRIVATE NOMINMAX)
+endif()
 
 add_custom_target(extendify.copyDeps DEPENDS setdll extendify_wrapper)
 add_custom_command(TARGET extendify.copyDeps

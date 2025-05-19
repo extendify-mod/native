@@ -1,3 +1,4 @@
+#pragma once
 #include "log/Logger.hpp"
 
 namespace Extendify::hook {

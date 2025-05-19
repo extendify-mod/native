@@ -1,7 +1,6 @@
 #include "Logger.hpp"
 
 #include "path/path.hpp"
-#include "spdlog/spdlog.h"
 #include "util/string.hpp"
 
 #include <algorithm>
@@ -19,8 +18,8 @@ Logger::Logger(const std::initializer_list<std::string>&& names):
 	logger(makeFullLoggerName(names),
 		   {
 			   getDefaultFileSink(),
-			   std::make_shared<spdlog::sinks::stderr_color_sink_st>(),
-			   std::make_shared<spdlog::sinks::stdout_color_sink_st>(),
+			   std::make_shared<spdlog::sinks::stderr_color_sink_mt>(),
+			   std::make_shared<spdlog::sinks::stdout_color_sink_mt>(),
 		   }),
 	_names(names) {
 		set_level(defaultLevel);
@@ -60,7 +59,7 @@ std::string Logger::makeFullLoggerName(const std::initializer_list<std::string>&
 
 std::shared_ptr<spdlog::sinks::sink> Logger::getDefaultFileSink() {
 	// TODO: use event handlers to handle opening the file with more than one process
-	static std::shared_ptr<spdlog::sinks::sink> sink = std::make_shared<spdlog::sinks::rotating_file_sink_st>(
+	static std::shared_ptr<spdlog::sinks::sink> sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
 		(path::getLogDir() / "native.log").string(), 1048576 * 5, 1000, false);
 
 	return sink;
