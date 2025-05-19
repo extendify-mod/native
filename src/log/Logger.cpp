@@ -19,7 +19,6 @@ Logger::Logger(const std::initializer_list<std::string>&& names):
 		   {
 			   getDefaultFileSink(),
 			   std::make_shared<spdlog::sinks::stderr_color_sink_mt>(),
-			   std::make_shared<spdlog::sinks::stdout_color_sink_mt>(),
 		   }),
 	_names(names) {
 		set_level(defaultLevel);
