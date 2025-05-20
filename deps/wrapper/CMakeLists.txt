@@ -12,3 +12,5 @@ else ()
 endif ()
 
 add_library(extendify_wrapper SHARED ${srcs})
+
+install(PROGRAMS $<TARGET_FILE:extendify_wrapper> TYPE LIB)

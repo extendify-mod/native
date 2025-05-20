@@ -59,12 +59,16 @@ if(WIN32_STD_MINMAX_NEEDS_NOMINMAX)
     target_compile_definitions(extendify PRIVATE NOMINMAX)
 endif()
 
+if(WIN32)
 add_custom_target(extendify.copyDeps DEPENDS setdll extendify_wrapper)
 add_custom_command(TARGET extendify.copyDeps
         PRE_BUILD
         COMMAND
         ${CMAKE_COMMAND} -E copy $<TARGET_FILE:setdll> ${CMAKE_CURRENT_BINARY_DIR}/setdll.exe
 )
+else()
+add_custom_target(extendify.copyDeps DEPENDS extendify_wrapper)
+endif()
 add_dependencies(extendify extendify.copyDeps)
 add_custom_command(TARGET extendify.copyDeps
         PRE_BUILD

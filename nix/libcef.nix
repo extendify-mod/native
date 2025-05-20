@@ -73,7 +73,7 @@ let
     };
   };
   platforms."aarch64-linux".sha256 = fakeHash;
-  platforms."x86_64-linux".sha256 = fakeHash;
+  platforms."x86_64-linux".sha256 = "sha256-3USaSwy8XrvJtChK6Zt0+/plv3zmkPzAQIFBkEL8vUY=";
 
   platformInfo =
     platforms.${stdenv.hostPlatform.system}
@@ -111,17 +111,16 @@ stdenv.mkDerivation rec {
 
     #own
 
-    TEMPD=$(mktemp -d)
-    mv $out/include/* $TEMPD
+    TEMPDIR=$(mktemp -d)
+    mv $out/include/* $TEMPDIR
     mkdir $out/include/include
-    mv $TEMPD/* $out/include/include
+    mv $TEMPDIR/* $out/include/include
     cp -r $out/include/include/* $out/include
   '';
 
   passthru.tests = {
     inherit obs-studio; # frequently breaks on CEF updates
   };
-  passthru.updateScript = ./update.sh;
 
   meta = with lib; {
     description = "Simple framework for embedding Chromium-based browsers in other applications";
