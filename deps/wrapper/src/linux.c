@@ -8,12 +8,20 @@ static const char *ENV_VAR_NAME = "EXTENDIFY_LIB_PATH";
 
 static const char *SPOTIFY_NAME = ".spotify-wrapped";
 
+int find_me_test() {
+	fprintf(stderr, "find_me_test called\n");
+	int foo = 0;
+	foo +=2;
+	return foo;
+}
+
 int __attribute__((constructor)) start() {
 	const char *path = getenv(ENV_VAR_NAME);
 	if (path == NULL) {
 		fprintf(stderr, "Environment variable %s not set\n", ENV_VAR_NAME);
 		return 1;
 	}
+	printf("%d", find_me_test());
 	FILE *fd = fopen("/proc/self/cmdline", "r");
 	if (fd == NULL) {
 		fprintf(stderr, "Failed to open /proc/self/cmdline");
@@ -42,10 +50,16 @@ int __attribute__((constructor)) start() {
 
 	if (strstr(cmdline, SPOTIFY_NAME) != NULL) {
 		fprintf(stderr, "Command line contains %s\n", SPOTIFY_NAME);
-		fprintf(stderr, "Loading libsadan.so from %s\n", path);
-		dlopen(path, RTLD_NOW);
+		fprintf(stderr, "Loading libextendify.so from %s\n", path);
+		void* ret = dlopen(path, RTLD_NOW);
+		if (!ret) {
+			fprintf(stderr, "Failed to load libextendify.so: %s\n", dlerror());
+			return 1;
+		} else {
+			fprintf(stderr, "Loaded libextendify.so\n");
+		}
 	} else {
-		fprintf(stderr, "Command line does not contain %s\nNot loading libsadan.\n",
+		fprintf(stderr, "Command line does not contain %s\nNot loading libextendify.\n",
 				SPOTIFY_NAME);
 		fprintf(stderr, "cmdline is: %s\n", cmdline);
 	}

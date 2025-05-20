@@ -54,18 +54,20 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 	return TRUE;
 }
 #elif defined(__linux__)
-__attribute__((constructor)) void ctor() {
+int __attribute__((constructor)) ctor() {
+	std::cout << "Extendify: ctor" << std::endl;
 	const Status ret = runStart();
 	if (ret != OK) {
 		Extendify::logger.error("Failed to runStart");
 	}
+	return 0;
 }
 
-__attribute__((constructor)) void dtor() {
+int __attribute__((destructor)) dtor() {
 	const Status ret = runStop();
 	if (ret != OK) {
 		Extendify::logger.error("Failed to runStop");
 	}
-	return;
+	return 0;
 }
 #endif

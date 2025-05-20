@@ -25,13 +25,18 @@
       "problemMatcher": []
     },
     {
-      "label": "(w32) inject wrapper and Generate launch.json",
+      "label": "inject wrapper and Generate launch.json",
       "type": "shell",
-      "command": "pwsh",
-      "args": [
-        "-File",
-        "${workspaceFolder}\\scripts\\injectWrapper.ps1"
-      ],
+      "windows": {
+        "command": "pwsh",
+        "args": [
+          "-File",
+          "${workspaceFolder}\\scripts\\injectWrapper.ps1"
+        ],
+      },
+      "linux": {
+        "command": "${workspaceFolder}/scripts/injectWrapper.sh"
+      },
       "problemMatcher": []
     },
     {

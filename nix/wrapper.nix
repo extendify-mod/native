@@ -8,4 +8,7 @@
   src = ../deps/wrapper;
 
   nativeBuildInputs = [ cmake ];
+  cmakeFlags = [
+    "-DCMAKE_BUILD_TYPE=Debug"
+  ];
 }

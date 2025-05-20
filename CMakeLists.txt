@@ -33,7 +33,7 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/deps/wrapper)
 # Link the library against spdlog
 target_link_libraries(extendify PRIVATE spdlog)
 target_link_libraries(extendify PRIVATE libcef_dll_wrapper)
-target_link_libraries(extendify PUBLIC libcef)
+target_link_libraries(extendify PRIVATE libcef)
 if (WIN32)
     target_link_libraries(extendify PRIVATE detours)
 elseif (LINUX)
@@ -70,8 +70,16 @@ else()
 add_custom_target(extendify.copyDeps DEPENDS extendify_wrapper)
 endif()
 add_dependencies(extendify extendify.copyDeps)
+if (WIN32)
 add_custom_command(TARGET extendify.copyDeps
         PRE_BUILD
         COMMAND
         ${CMAKE_COMMAND} -E copy $<TARGET_FILE:extendify_wrapper> ${CMAKE_CURRENT_BINARY_DIR}/extendify_wrapper.dll
 )
+else()
+add_custom_command(TARGET extendify.copyDeps
+        PRE_BUILD
+        COMMAND
+        ${CMAKE_COMMAND} -E copy $<TARGET_FILE:extendify_wrapper> ${CMAKE_CURRENT_BINARY_DIR}/extendify_wrapper.so
+)
+endif()

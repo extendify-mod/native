@@ -39,9 +39,11 @@ if (LINUX)
             URL ${CEF_DOWNLOAD_URL}
             URL_HASH SHA1=${CEF_HASH}
             DOWNLOAD_EXTRACT_TIMESTAMP FALSE
-            # PATCH_COMMAND patch compilerChecks.cmake "${CMAKE_CURRENT_LIST_DIR}/noTests.patch"
+            PATCH_COMMAND patch ./cmake/cef_variables.cmake "${CMAKE_CURRENT_LIST_DIR}/linuxFlags.patch"
     )
+    # Bug with fortify source
     fetchcontent_makeavailable(cef_dll_wrapper)
+    list(APPEND CEF_COMPILER_FLAGS_DEBUG -Og)
 elseif (WIN32)
     cmake_policy(SET CMP0169 OLD)
 

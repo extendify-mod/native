@@ -20,9 +20,10 @@
         };
         _libcef = pkgs.callPackage ./nix/libcef.nix { };
         libcef = pkgs.enableDebugging _libcef;
-        wrapper = pkgs.callPackage ./nix/wrapper.nix { };
+        _wrapper = pkgs.callPackage ./nix/wrapper.nix { };
+        wrapper = pkgs.enableDebugging _wrapper;
         spotify = pkgs.callPackage ./nix/spotify.nix {
-          cef = libcef;
+          # cef = libcef;
           extendifyWrapper = wrapper;
         };
       in
@@ -30,13 +31,21 @@
         devShells.default =
           let
             deps = with pkgs; [
+              curlWithGnuTls
+            ];
+            inherit (pkgs) lib stdenv;
+          in
+          pkgs.mkShell {
+            NIX_LD_LIBRARY_PATH = lib.makeLibraryPath deps;
+            NIX_LD = lib.fileContents "${stdenv.cc}/nix-support/dynamic-linker";
+            LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [
+              libgcc.lib
               alsa-lib
               at-spi2-atk
               at-spi2-core
               atk
               cairo
               cups
-              curlWithGnuTls
               dbus
               expat
               ffmpeg_4 # Requires libavcodec < 59 as of 1.2.9.743.g85d9593d
@@ -77,19 +86,11 @@
               xorg.libXtst
               zlib
               openssl
-            ];
-            inherit (pkgs) lib stdenv;
-          in
-          pkgs.mkShell {
-            packages = [
-              libcef
-            ];
-            NIX_LD_LIBRARY_PATH = lib.makeLibraryPath deps;
-            NIX_LD = lib.fileContents "${stdenv.cc}/nix-support/dynamic-linker";
+            ]);
             libcef_ROOT = "${libcef}";
             libcef_INCLUDE_DIR = "${libcef}/include";
             shellHook = ''
-
+              export EXTENDIFY_LIB_PATH="$(pwd)/build/libextendify.so"
             '';
           };
         packages = {

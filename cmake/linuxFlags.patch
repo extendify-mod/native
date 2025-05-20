@@ -1,0 +1,11 @@
+--- cef_variables.cmake	2025-05-19 22:30:02.151694234 -0400
++++ "cef_variables copy.cmake"	2025-05-19 22:30:24.513146252 -0400
+@@ -119,7 +119,7 @@
+     -Wsign-compare                  # Warn about mixed signed/unsigned type comparisons
+     )
+   list(APPEND CEF_COMPILER_FLAGS_DEBUG
+-    -O0                             # Disable optimizations
++    -Og                             # Disable optimizations
+     -g                              # Generate debug information
+     )
+   list(APPEND CEF_COMPILER_FLAGS_RELEASE

@@ -10,7 +10,9 @@
       "type": "cppvsdbg",
       "request": "launch",
       "program": "",
-      "args": ["--single-process"],
+      "args": [
+        "--single-process"
+      ],
       "stopAtEntry": false,
       "cwd": "${workspaceRoot}",
       "environment": [
@@ -37,8 +39,10 @@
       "type": "cppdbg",
       "request": "launch",
       "program": "",
-      "args": ["--single-process"],
-      "stopAtEntry": false,
+      "args": [
+        "--single-process"
+      ],
+      "stopAtEntry": true,
       "cwd": "${workspaceFolder}",
       "windows": {
         "environment": [
@@ -52,14 +56,18 @@
         "environment": [
           {
             "name": "EXTENDIFY_LIB_PATH",
-            "value": "${workspaceFolder}/build/extendify.so"
+            "value": "${workspaceFolder}/build/libextendify.so"
           }
-        ]
+        ],
+        "program": "${workspaceFolder}/result/share/spotify/.spotify-wrapped"
       },
       "externalConsole": false,
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [
+        {
+          "text": "source ${workspaceFolder}/.gdbinit.vsc"
+        },
         {
           "description": "Enable pretty-printing for gdb",
           "text": "-enable-pretty-printing",
