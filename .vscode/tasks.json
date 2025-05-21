@@ -25,14 +25,10 @@
       "problemMatcher": []
     },
     {
-      "label": "inject wrapper and Generate launch.json",
+      "label": "inject wrapper",
       "type": "shell",
       "windows": {
-        "command": "pwsh",
-        "args": [
-          "-File",
-          "${workspaceFolder}\\scripts\\injectWrapper.ps1"
-        ],
+        "command": "${workspaceFolder}\\scripts\\injectWrapper.ps1",
       },
       "linux": {
         "command": "${workspaceFolder}/scripts/injectWrapper.sh"
@@ -40,10 +36,21 @@
       "problemMatcher": []
     },
     {
+      "label": "generate launch.json",
+      "type": "shell",
+      "windows": {
+        "command": "${workspaceFolder}\\scripts\\generateLaunchJSON.ps1",
+      },
+      "linux": {
+        "command": "${workspaceFolder}/scripts/generateLaunchJSON.sh"
+      },
+      "problemMatcher": []
+    },
+    {
       "type": "cmake",
       "label": "Configure",
       "command": "configure",
-      "problemMatcher": [],
+      "problemMatcher": []
     }
   ]
 }

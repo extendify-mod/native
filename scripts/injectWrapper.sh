@@ -5,5 +5,3 @@ if [[ ! -e "${SCRIPT_PATH}/../result/share/spotify/.spotify-wrapped" ]]; then
     echo "Spotify not installed, please build spotify using the nix flake first";
     exit 1;
 fi
-
-cp "${SCRIPT_PATH}/launch.json" "${SCRIPT_PATH}/../.vscode/launch.json"
