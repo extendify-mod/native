@@ -19,6 +19,4 @@ namespace Extendify::fs {
 	std::string readFile(const std::filesystem::path& path);
 
 	void writeFile(const std::filesystem::path& path, const std::string& contents);
-
-	class Watcher { };
 } // namespace Extendify::fs
