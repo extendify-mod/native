@@ -1,11 +1,258 @@
 #include "Watcher.hpp"
 
-using Extendify::fs::Watcher;
+#include "log/Logger.hpp"
 
-int Watcher::nextId = 1;
+#include <algorithm>
+#include <basetsd.h>
+#include <cstdint>
+#include <exception>
+#include <filesystem>
+#include <handleapi.h>
+#include <ioapiset.h>
+#include <mutex>
+#include <stdexcept>
+#include <synchapi.h>
+#include <utility>
+#include <winnt.h>
+
+using namespace Extendify;
+using fs::Watcher;
+static constexpr DWORD events = FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_LAST_WRITE;
+std::atomic_int Watcher::Dir::nextId = 1;
+
+static constexpr Watcher::Reason reasonFromAction(DWORD action) {
+	switch (action) {
+		case FILE_ACTION_ADDED:
+			return Watcher::Reason::ADDED;
+		case FILE_ACTION_REMOVED:
+			return Watcher::Reason::REMOVED;
+		case FILE_ACTION_MODIFIED:
+			return Watcher::Reason::MODIFIED;
+		case FILE_ACTION_RENAMED_OLD_NAME:
+			return Watcher::Reason::RENAMED_OLD_NAME;
+		case FILE_ACTION_RENAMED_NEW_NAME:
+			return Watcher::Reason::RENAMED_NEW_NAME;
+		default:
+			assert(false && "Unknown action type");
+			std::unreachable();
+	}
+}
+
+Watcher::Dir::Dir(std::filesystem::path baseDir, HANDLE onChange):
+	buf(),
+	baseDir(std::move(baseDir)),
+	overlapped(),
+	onChange(onChange) {
+
+	HANDLE _baseDirHandle = CreateFile(this->baseDir.string().c_str(),
+									   FILE_LIST_DIRECTORY | GENERIC_READ,
+									   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+									   nullptr,
+									   OPEN_EXISTING,
+									   FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
+									   nullptr);
+
+	if (_baseDirHandle == INVALID_HANDLE_VALUE) {
+		throw std::runtime_error(
+			std::format("Error opening base dir {}: {}", this->baseDir.string(), GetLastError()));
+	}
+	baseDirHandle = _baseDirHandle;
+	if (nullptr == CreateIoCompletionPort(baseDirHandle, onChange, (ULONG_PTR)&baseDir, 0)) {
+		throw std::runtime_error(
+			std::format("Error creating IO completion port: {}", GetLastError()));
+	}
+}
+
+void Watcher::Dir::watch() {
+	memset(buf, 0, sizeof(buf));
+	memset(&overlapped, 0, sizeof(overlapped));
+	if (!ReadDirectoryChangesW(
+			baseDirHandle, &buf, sizeof(buf), false, events, nullptr, &overlapped, nullptr)) {
+		const auto msg = std::format("Failed to read directory changes: {}", GetLastError());
+		logger.error(msg);
+		throw std::runtime_error(msg);
+	}
+};
+
+int Watcher::Dir::addFile(const std::filesystem::path& path, const Callback& callback) {
+	assert(!path.empty() && "Path cannot be empty");
+	assert(callback != nullptr && "Callback cannot be null");
+	if (path != baseDir && path.parent_path() != baseDir) {
+		throw std::invalid_argument(
+			std::format("Path must be a direct child of the base dir or the "
+						"base dir itself. Base dir: {}, path: {}",
+						baseDir.string(),
+						path.string()));
+	}
+	std::scoped_lock lock(callbacksMutex, idsMutex, pathsMutex);
+	auto id = ++nextId;
+	if (ids.contains(path)) {
+		ids[path].push_back(id);
+	} else {
+		ids[path] = {id};
+	}
+	paths[id] = path;
+	callbacks[id] = callback;
+	return id;
+}
+
+void Watcher::Dir::removeFile(int id) {
+	{
+		std::scoped_lock lock(callbacksMutex);
+		if (callbacks.contains(id)) {
+			callbacks.erase(id);
+		} else {
+			logger.warn("No callback registered for id {}, ignoring it", id);
+		}
+	}
+	std::optional<std::filesystem::path> path;
+	{
+		std::scoped_lock lock(pathsMutex);
+		if (paths.contains(id)) {
+			path = paths[id];
+			paths.erase(id);
+		} else {
+			logger.warn("No path registered for id {}, ignoring it", id);
+		}
+	}
+	if (path) {
+		std::scoped_lock lock(idsMutex);
+		if (ids.contains(*path)) {
+			auto& vec = ids[*path];
+			if (const auto pos = std::find(vec.begin(), vec.end(), id); pos != vec.end()) {
+				vec.erase(pos);
+			} else {
+				logger.warn("No id {} registered for path {}, ignoring it", id, path->string());
+			}
+		}
+	}
+}
+
+log::Logger Watcher::logger({"Extendify", "fs", "Watcher"});
+
+Watcher::Event::Event(std::filesystem::path path, Reason reason, int watchId):
+	Change {std::move(path), reason},
+	watchId(watchId) {
+}
 
 #ifdef _WIN32
-#warning TODO
+Watcher::Watcher() {
+	auto _onChange = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 1);
+	if (_onChange == nullptr) {
+		logger.error("Error creating IO completion port: {}", GetLastError());
+	}
+	onChange = _onChange;
+	auto _hasEvents = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	if (_hasEvents == nullptr) {
+		logger.error("Error creating event: {}", GetLastError());
+	}
+	hasEvents = _hasEvents;
+}
+
+void Watcher::init() {
+}
+
+int Watcher::addFile(const std::filesystem::path& path, const Callback& callback) {
+	if (path.empty()) {
+		throw std::invalid_argument("Path cannot be empty");
+	}
+	if (callback == nullptr) {
+		throw std::invalid_argument("Callback cannot be null");
+	}
+	auto dirname = path.parent_path();
+	dirs.try_emplace(dirname, std::make_unique<Dir>(dirname, onChange));
+	return dirs[dirname]->addFile(path, callback);
+}
+
+void Watcher::runLoop() {
+	DWORD bytesTransferred;
+	OVERLAPPED* overlapped;
+	while (true) {
+		// Any valid id that maps to a path
+		const std::filesystem::path* dirPath;
+		auto ret = GetQueuedCompletionStatus(
+			onChange, &bytesTransferred, (ULONG_PTR*)&dirPath, &overlapped, INFINITE);
+		if (!ret) {
+			logger.error("Error getting queued completion status: {}", GetLastError());
+			continue;
+		}
+		if (dirPath == nullptr) {
+			logger.error("dir is null");
+			continue;
+		}
+		if (bytesTransferred == 0) {
+			logger.warn("Bytes transferred is 0");
+			continue;
+		}
+		// process the events
+		{
+			std::scoped_lock lock(pendingEventsMutex, dirsMutex);
+			if (!dirs.contains(*dirPath)) {
+				logger.warn("No directory registered for {}, ignoring it", dirPath->string());
+				continue;
+			}
+			const auto& dir = dirs[*dirPath];
+			const auto& data = dir->buf;
+			int64_t offset = 0;
+			do {
+				const auto cur = (FILE_NOTIFY_INFORMATION*)(data + offset);
+				const auto reason = reasonFromAction(cur->Action);
+				std::filesystem::path filename(
+					{cur->FileName, cur->FileNameLength / sizeof(WCHAR)});
+				pendingEvents.emplace_back(std::move(filename), reason);
+				offset += cur->NextEntryOffset;
+			} while (offset);
+		}
+		SetEvent(hasEvents);
+	}
+}
+
+void Watcher::processEvents() {
+	std::deque<std::pair<std::unique_ptr<Event>, Callback>> toProcess;
+	while (true) {
+		{
+			if (!toProcess.empty()) {
+				constexpr static auto msg = "Pending events not empty, This should never happen";
+				logger.error(msg);
+				throw std::runtime_error(msg);
+			}
+			std::scoped_lock lock(pendingEventsMutex, dirsMutex);
+			for (const auto& [path, reason] : pendingEvents) {
+				const auto dirname = path.parent_path();
+				if (dirs.contains(dirname)) {
+					const auto& dir = dirs[dirname];
+					std::scoped_lock lock(dir->idsMutex);
+					if (dir->ids.contains(path)) {
+						const auto& vec = dir->ids[path];
+						for (const auto& id : vec) {
+							toProcess.emplace_back(std::make_unique<Event>(path, reason, id),
+												   dir->callbacks[id]);
+						}
+					} else {
+						logger.warn(
+							"Recieved event for path {} but no id registered for it, ignoring it",
+							path.string());
+					}
+				}
+			}
+			pendingEvents.clear();
+		}
+		while (!toProcess.empty()) {
+			auto _entry = toProcess.erase(toProcess.begin());
+			auto event = std::move(_entry->first);
+			auto callback = std::move(_entry->second);
+			assert(callback != nullptr && "Callback cannot be null");
+			try {
+				callback(std::move(event));
+			} catch (std::exception& e) {
+				logger.error(std::format("Error occurred while processing {}, {}", event, e.what()));
+			}
+		}
+		// wait for next event
+		WaitForSingleObjectEx(hasEvents, INFINITE, true);
+	}
+}
+
 #elif defined(__linux__)
 #warning TODO
 #endif

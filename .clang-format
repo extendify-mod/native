@@ -15,6 +15,7 @@ AlignTrailingComments:
   OverEmptyLines:  0
 AllowShortEnumsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: None
+BinPackArguments:  false
 BraceWrapping:
   AfterCaseLabel:  false
   AfterClass:      false
@@ -43,7 +44,7 @@ BreakBeforeBraces: Attach
 BreakConstructorInitializers: AfterColon
 BreakInheritanceList: AfterColon
 BreakTemplateDeclarations: Yes
-ColumnLimit:     120
+ColumnLimit:     100
 CommentPragmas:  '^ IWYU pragma:'
 ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4
