@@ -11,9 +11,9 @@ else ()
     message(FATAL_ERROR "OS not supported")
 endif ()
 
-list(APPEND CMAKE_C_FLAGS "-gdwarf -O0")
 
 add_library(extendify_wrapper SHARED ${srcs})
 
+target_compile_options(extendify_wrapper PRIVATE -gdwarf -O0)
 
 install(PROGRAMS $<TARGET_FILE:extendify_wrapper> TYPE LIB)
