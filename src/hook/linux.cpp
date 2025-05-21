@@ -3,23 +3,22 @@
 
 #include <dobby.h>
 
-using namespace Extendify::hook;
-
-long hookFunction(void* orig, void* hookFunc) {
-	if (const long ret = DobbyHook(*static_cast<void**>(orig), hookFunc, static_cast<void**>(orig))) {
-		logger.error("Failed to hook function {}", orig);
-		return ret;
+namespace Extendify::hook {
+	long hookFunction(void* orig, void* hookFunc) {
+		if (const long ret = DobbyHook(*static_cast<void**>(orig), hookFunc, static_cast<void**>(orig))) {
+			logger.error("Failed to hook function {}", orig);
+			return ret;
+		}
+		return 0;
 	}
-	return 0;
-}
 
-long unhookFunction(void* orig, void* hookFunc) {
-	if (const long ret = DobbyDestroy(orig)) {
-		logger.error("Failed to unhook function {}", orig);
-		return ret;
+	long unhookFunction(void* orig, void* hookFunc) {
+		if (const long ret = DobbyDestroy(orig)) {
+			logger.error("Failed to unhook function {}", orig);
+			return ret;
+		}
+		return 0;
 	}
-	return 0;
-}
-
+} // namespace Extendify::hook
 
 #endif

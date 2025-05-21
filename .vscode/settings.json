@@ -29,6 +29,7 @@
         "linuxarm",
         "mktemp",
         "nixpkgs",
+        "NOLINTNEXTLINE",
         "nspr",
         "pango",
         "passthru",

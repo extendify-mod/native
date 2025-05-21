@@ -31,7 +31,10 @@ endif ()
 
 # go to https://www.spotify.com/us/opensource/, copy correct cef version, run it in this
 # paste | python -c 'import sys; from urllib.parse import quote; print(quote(sys.stdin.read()))' | tee /dev/stderr | copy
-set(BUILD_STR "134.3.11%2Bg7c94248%2Bchromium-134.0.6998.178")
+set(BUILD_STR_VER "134.3.11")
+set(BUILD_STR_REV "7c94248")
+set(BUILD_STR_CHROMIUM "134.0.6998.178")
+set(BUILD_STR "${BUILD_STR_VER}%2Bg${BUILD_STR_REV}%2Bchromium-${BUILD_STR_CHROMIUM}")
 set(CEF_DOWNLOAD_URL "https://cef-builds.spotifycdn.com/cef_binary_${BUILD_STR}_${CEF_OS}${CEF_ARCH}_minimal.tar.bz2")
 if (LINUX)
     FetchContent_declare(
