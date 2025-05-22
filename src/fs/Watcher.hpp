@@ -6,17 +6,11 @@
 #include <filesystem>
 #include <format>
 #include <functional>
+#include <include/internal/cef_ptr.h>
 #include <memory>
-#include <tuple>
 #include <unordered_map>
 #include <utility>
-
-#ifdef _WIN32
-#include <Windows.h>
-
-#include <winnt.h>
-
-#endif
+#include <cef_thread.h>
 
 namespace Extendify::fs {
 	class Watcher final {
@@ -66,9 +60,15 @@ namespace Extendify::fs {
 		 * cef_initialize being killed for sandbox reasons
 		 */
 		void init();
-
+		
 	  private:
 		static log::Logger logger;
+		[[noreturn]] void runLoop();
+		std::atomic_bool running;
+
+		CefRefPtr<CefThread> watchingThread;
+#ifdef _WIN32
+		CefRefPtr<CefThread> eventThread;
 
 		class Dir {
 		  public:
@@ -105,26 +105,10 @@ namespace Extendify::fs {
 		 */
 		std::unordered_map<std::filesystem::path, std::unique_ptr<Dir>> dirs;
 
-		enum class TransactionType {
-			ADD,
-			REMOVE
-		};
-
-		typedef std::tuple<int, TransactionType> PendingTransaction;
-		/**
-		 * @brief pending transactions
-		 *
-		 * used before the watching thread is started
-		 * and while the thread is running
-		 */
-		std::deque<PendingTransaction> pendingTransactions;
-
 		std::mutex pendingEventsMutex;
 		std::deque<std::pair<std::filesystem::path, Reason>> pendingEvents;
 
-		void runLoop();
-		void processEvents();
-#ifdef _WIN32
+		[[noreturn]] void processEvents();
 		/**
 		 * @brief triggered when a file is changed
 		 */
@@ -218,8 +202,7 @@ struct std::formatter<Extendify::fs::Watcher::Reason> {
 	}
 
 	template<typename FmtCtx>
-	FmtCtx::iterator format(const Extendify::fs::Watcher::Reason& event,
-							FmtCtx& ctx) const {
+	FmtCtx::iterator format(const Extendify::fs::Watcher::Reason& event, FmtCtx& ctx) const {
 		if (!ok) {
 			unreachable();
 		}

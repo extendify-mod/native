@@ -1,24 +1,44 @@
 #include "Watcher.hpp"
 
 #include "log/Logger.hpp"
+#include "util/TaskCBHandler.hpp"
 
 #include <algorithm>
-#include <basetsd.h>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
-#include <handleapi.h>
-#include <ioapiset.h>
 #include <mutex>
 #include <stdexcept>
-#include <synchapi.h>
 #include <utility>
-#include <winnt.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 using namespace Extendify;
 using fs::Watcher;
+
+#ifdef _WIN32
 static constexpr DWORD events = FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_LAST_WRITE;
-std::atomic_int Watcher::Dir::nextId = 1;
+#endif
+
+log::Logger Watcher::logger({"Extendify", "fs", "Watcher"});
+
+void Watcher::init() {
+	if (running) {
+		logger.warn("Watcher already running, ignoring it");
+		return;
+	}
+	running = true;
+	watchingThread = CefThread::CreateThread("FSWatcher");
+	watchingThread->GetTaskRunner()->PostTask(
+		util::TaskCBHandler::Create([this] [[noreturn]] () { runLoop(); }));
+#ifdef _WIN32
+	eventThread = CefThread::CreateThread("FSWatcherEvents");
+	eventThread->GetTaskRunner()->PostTask(
+		util::TaskCBHandler::Create([this] [[noreturn]] () { processEvents(); }));
+#endif
+}
 
 static constexpr Watcher::Reason reasonFromAction(DWORD action) {
 	switch (action) {
@@ -37,6 +57,95 @@ static constexpr Watcher::Reason reasonFromAction(DWORD action) {
 			std::unreachable();
 	}
 }
+
+Watcher::Event::Event(std::filesystem::path path, Reason reason, int watchId):
+	Change {std::move(path), reason},
+	watchId(watchId) {
+}
+
+Watcher::Watcher() {
+#ifdef _WIN32
+	auto _onChange = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 1);
+	if (_onChange == nullptr) {
+		logger.error("Error creating IO completion port: {}", GetLastError());
+	}
+	onChange = _onChange;
+	auto _hasEvents = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	if (_hasEvents == nullptr) {
+		logger.error("Error creating event: {}", GetLastError());
+	}
+	hasEvents = _hasEvents;
+#endif
+}
+
+int Watcher::addFile(const std::filesystem::path& path, const Callback& callback) {
+	if (path.empty()) {
+		throw std::invalid_argument("Path cannot be empty");
+	}
+	if (callback == nullptr) {
+		throw std::invalid_argument("Callback cannot be null");
+	}
+	auto dirname = path.parent_path();
+
+#ifdef _WIN32
+	if (!dirs.contains(dirname)) {
+		dirs.emplace(dirname, std::make_unique<Dir>(dirname, onChange));
+		dirs[dirname]->watch();
+	}
+
+	return dirs[dirname]->addFile(path, callback);
+#endif
+}
+
+[[noreturn]] void Watcher::runLoop() {
+#ifdef _WIN32
+	DWORD bytesTransferred;
+	OVERLAPPED* overlapped;
+	while (true) {
+		// Any valid id that maps to a path
+		const std::filesystem::path* dirPath;
+		auto ret = GetQueuedCompletionStatus(
+			onChange, &bytesTransferred, (ULONG_PTR*)&dirPath, &overlapped, INFINITE);
+		if (!ret) {
+			logger.error("Error getting queued completion status: {}", GetLastError());
+			continue;
+		}
+		if (dirPath == nullptr) {
+			logger.error("dir is null");
+			continue;
+		}
+		if (bytesTransferred == 0) {
+			logger.warn("Bytes transferred is 0");
+			continue;
+		}
+		// process the events
+		{
+			std::scoped_lock lock(pendingEventsMutex, dirsMutex);
+			if (!dirs.contains(*dirPath)) {
+				logger.warn("No directory registered for {}, ignoring it", dirPath->string());
+				continue;
+			}
+			const auto& dir = dirs[*dirPath];
+			const auto& data = dir->buf;
+			int64_t offset = 0;
+			do {
+				const auto cur = (FILE_NOTIFY_INFORMATION*)(data + offset);
+				const auto reason = reasonFromAction(cur->Action);
+				std::filesystem::path filename(
+					{cur->FileName, cur->FileNameLength / sizeof(WCHAR)});
+				pendingEvents.emplace_back(std::move(filename), reason);
+				offset += cur->NextEntryOffset;
+			} while (offset);
+			dir->watch();
+		}
+		SetEvent(hasEvents);
+	}
+#endif
+}
+
+#ifdef _WIN32
+
+std::atomic_int Watcher::Dir::nextId = 1;
 
 Watcher::Dir::Dir(std::filesystem::path baseDir, HANDLE onChange):
 	buf(),
@@ -128,86 +237,7 @@ void Watcher::Dir::removeFile(int id) {
 	}
 }
 
-log::Logger Watcher::logger({"Extendify", "fs", "Watcher"});
-
-Watcher::Event::Event(std::filesystem::path path, Reason reason, int watchId):
-	Change {std::move(path), reason},
-	watchId(watchId) {
-}
-
-#ifdef _WIN32
-Watcher::Watcher() {
-	auto _onChange = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 1);
-	if (_onChange == nullptr) {
-		logger.error("Error creating IO completion port: {}", GetLastError());
-	}
-	onChange = _onChange;
-	auto _hasEvents = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-	if (_hasEvents == nullptr) {
-		logger.error("Error creating event: {}", GetLastError());
-	}
-	hasEvents = _hasEvents;
-}
-
-void Watcher::init() {
-}
-
-int Watcher::addFile(const std::filesystem::path& path, const Callback& callback) {
-	if (path.empty()) {
-		throw std::invalid_argument("Path cannot be empty");
-	}
-	if (callback == nullptr) {
-		throw std::invalid_argument("Callback cannot be null");
-	}
-	auto dirname = path.parent_path();
-	dirs.try_emplace(dirname, std::make_unique<Dir>(dirname, onChange));
-	return dirs[dirname]->addFile(path, callback);
-}
-
-void Watcher::runLoop() {
-	DWORD bytesTransferred;
-	OVERLAPPED* overlapped;
-	while (true) {
-		// Any valid id that maps to a path
-		const std::filesystem::path* dirPath;
-		auto ret = GetQueuedCompletionStatus(
-			onChange, &bytesTransferred, (ULONG_PTR*)&dirPath, &overlapped, INFINITE);
-		if (!ret) {
-			logger.error("Error getting queued completion status: {}", GetLastError());
-			continue;
-		}
-		if (dirPath == nullptr) {
-			logger.error("dir is null");
-			continue;
-		}
-		if (bytesTransferred == 0) {
-			logger.warn("Bytes transferred is 0");
-			continue;
-		}
-		// process the events
-		{
-			std::scoped_lock lock(pendingEventsMutex, dirsMutex);
-			if (!dirs.contains(*dirPath)) {
-				logger.warn("No directory registered for {}, ignoring it", dirPath->string());
-				continue;
-			}
-			const auto& dir = dirs[*dirPath];
-			const auto& data = dir->buf;
-			int64_t offset = 0;
-			do {
-				const auto cur = (FILE_NOTIFY_INFORMATION*)(data + offset);
-				const auto reason = reasonFromAction(cur->Action);
-				std::filesystem::path filename(
-					{cur->FileName, cur->FileNameLength / sizeof(WCHAR)});
-				pendingEvents.emplace_back(std::move(filename), reason);
-				offset += cur->NextEntryOffset;
-			} while (offset);
-		}
-		SetEvent(hasEvents);
-	}
-}
-
-void Watcher::processEvents() {
+[[noreturn]] void Watcher::processEvents() {
 	std::deque<std::pair<std::unique_ptr<Event>, Callback>> toProcess;
 	while (true) {
 		{
@@ -245,7 +275,8 @@ void Watcher::processEvents() {
 			try {
 				callback(std::move(event));
 			} catch (std::exception& e) {
-				logger.error(std::format("Error occurred while processing {}, {}", event, e.what()));
+				logger.error(
+					std::format("Error occurred while processing {}, {}", event, e.what()));
 			}
 		}
 		// wait for next event
