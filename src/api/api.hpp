@@ -14,6 +14,14 @@ namespace Extendify::api {
 	extern log::Logger logger;
 	void inject(const CefRefPtr<CefV8Context>& context);
 
+	/**
+	 * @brief Get the Type Name object
+	 * 
+	 * @param value 
+	 * @return const std::string& 
+	 */
+	std::string getTypeName(const CefRefPtr<CefV8Value>& value);
+
 	class CBHandler final: public CefV8Handler {
 	  public:
 		typedef std::function<bool(CB_HANDLER_ARGS)> Callback;

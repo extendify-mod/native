@@ -62,6 +62,19 @@ fs::path path::getLogDir() {
 	return getLogDir(false);
 }
 
+fs::path path::getQuickCssFile() {
+	return getQuickCssFile(false);
+}
+
+fs::path path::getQuickCssFile(bool createIfNeeded) {
+	const auto base = getBaseConfigDir(createIfNeeded);
+	auto quickCssPath = base / "quickCss.css";
+	if (createIfNeeded) {
+		ensureFile(quickCssPath);
+	}
+	return quickCssPath;
+}
+
 bool path::ensureDir(const std::filesystem::path& path) {
 	if (fs::exists(path)) {
 		logger.debug("Directory {} already exists", path.string());

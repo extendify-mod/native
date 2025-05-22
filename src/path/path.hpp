@@ -11,6 +11,8 @@ namespace Extendify::path {
 	std::filesystem::path getConfigFilePath(bool createIfNeeded);
 	std::filesystem::path getLogDir();
 	std::filesystem::path getLogDir(bool createIfNeeded);
+	std::filesystem::path getQuickCssFile();
+	std::filesystem::path getQuickCssFile(bool createIfNeeded);
 
 	/**
 	 * @brief Creates `path` if it does not exist
