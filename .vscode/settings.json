@@ -54,4 +54,5 @@
         "Xrender",
         "Xtst"
     ],
+    "editor.insertSpaces": false
 }
