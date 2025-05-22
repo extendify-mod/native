@@ -40,6 +40,7 @@ void Watcher::init() {
 #endif
 }
 
+#ifdef _WIN32
 static constexpr Watcher::Reason reasonFromAction(DWORD action) {
 	switch (action) {
 		case FILE_ACTION_ADDED:
@@ -57,6 +58,7 @@ static constexpr Watcher::Reason reasonFromAction(DWORD action) {
 			std::unreachable();
 	}
 }
+#endif
 
 Watcher::Event::Event(std::filesystem::path path, Reason reason, int watchId):
 	Change {std::move(path), reason},

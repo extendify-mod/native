@@ -1,6 +1,7 @@
 #include "fs.hpp"
 
 #include <filesystem>
+#include <cef_command_line.h>
 #include <fstream>
 #include <sstream>
 
@@ -53,15 +54,15 @@ namespace Extendify::fs {
 
 		bool XDGUtil(const std::vector<std::string>& argv, const std::filesystem::path& workingDir,
 					 const bool waitForExit, const bool focusLaunchedProcess,
-					 OpenCallback callback) {
-			// auto cli = 
+					 const OpenCallback& callback) {
+			auto cli = CefCommandLine::CreateCommandLine();
 			#warning TODO
 			return false;
 		}
 
 		bool XDGOpen(const std::filesystem::path& working_dir, const std::string& fileName,
 					 const bool waitForExit, const OpenCallback& callback) {
-			return XDGUtil({"xdg-open", fileName}, working_dir, waitForExit, true, std::move(callback));
+			return XDGUtil({"xdg-open", fileName}, working_dir, waitForExit, true, callback);
 		}
 	} // namespace
 #endif
