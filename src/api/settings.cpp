@@ -9,16 +9,30 @@
 #include <cef_base.h>
 #include <cef_v8.h>
 
-using namespace Extendify;
-using namespace api;
-using namespace settings;
-
 namespace Extendify::api::settings {
+	namespace usage {
+		APIUsage get {APIFunction {
+			.name = "get",
+			.description = "Get the settings object",
+			.path = "settings",
+			.expectedArgs = {},
+			.returnType = V8Type::OBJECT,
+		}};
+		APIUsage set {APIFunction {
+			.name = "set",
+			.description = "Set the settings object",
+			.path = "settings",
+			.expectedArgs = {V8Type::OBJECT | V8Type::NULL_TYPE},
+			.returnType = V8Type::UNDEFINED,
+		}};
+	} // namespace usage
+
 	log::Logger logger({"Extendify", "api", "settings"});
 
 	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	static auto getHandler = CBHandler::Create([](CB_HANDLER_ARGS) {
 		try {
+			usage::get.validateOrThrow(arguments);
 			const auto settingsString = readSettingsFile();
 			auto settingsObject = parseSettings(settingsString);
 			retval = settingsObject;
@@ -32,18 +46,8 @@ namespace Extendify::api::settings {
 	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	static auto setHandler = CBHandler::Create([](CB_HANDLER_ARGS) {
 		try {
-			const auto numArgs = arguments.size();
-			if (numArgs != 1) {
-				settings::logger.error("settings.set() requires 1 argument, got {}", numArgs);
-				exception = "settings.set() requires 1 argument";
-				return true;
-			}
-			const auto& obj = arguments[0];
-			if (!obj->IsObject()) {
-				settings::logger.error("settings.set() requires an object argument");
-				exception = "settings.set() requires an object argument";
-				return true;
-			}
+			usage::set.validateOrThrow(arguments);
+			const auto obj = arguments[0];
 			const auto settingsString = util::json::stringify(obj);
 			writeSettingsFile(settingsString);
 
@@ -76,7 +80,8 @@ namespace Extendify::api::settings {
 		auto setFunc = CefV8Value::CreateFunction("set", setHandler);
 		api->SetValue("set", setFunc, V8_PROPERTY_ATTRIBUTE_NONE);
 
-		auto getSettingsDirFunc = CefV8Value::CreateFunction("getSettingsDir", getSettingsDirHandler);
+		auto getSettingsDirFunc =
+			CefV8Value::CreateFunction("getSettingsDir", getSettingsDirHandler);
 		api->SetValue("getSettingsDir", getSettingsDirFunc, V8_PROPERTY_ATTRIBUTE_NONE);
 
 		return api;
@@ -103,4 +108,4 @@ namespace Extendify::api::settings {
             "colors": []
         }
     })";
-} // namespace api::settings
+} // namespace Extendify::api::settings

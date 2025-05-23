@@ -20,11 +20,13 @@ namespace Extendify::fs {
 
 	void writeFile(const std::filesystem::path& path, const std::string& contents);
 	
-	typedef std::optional<std::function<void(const std::string&)>> OpenCallback;
 	/**
 	 * @brief opens a path in the users default application
 	 * 
-	 * @param path 
+	 * @param path the path to open
+	 * @param workingDir the working directory to use
+	 * 
+	 * @return true if an error occurred, false otherwise
 	 */
-	void openPath(const std::filesystem::path& path, OpenCallback callback);
+	bool openPath(const std::filesystem::path& path, std::optional<const std::filesystem::path*> workingDir);
 } // namespace Extendify::fs
