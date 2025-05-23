@@ -1,5 +1,6 @@
 #pragma once
 #include "log/Logger.hpp"
+#include "log/log.hpp"
 
 #include <atomic>
 #include <deque>
@@ -218,7 +219,6 @@ struct std::formatter<Extendify::fs::Watcher::Reason> {
 			case Extendify::fs::Watcher::Reason::RENAMED_NEW_NAME:
 				return std::format_to(ctx.out(), "RENAMED_NEW_NAME");
 		}
-		assert(false && "Unknown reason type");
-		unreachable();
+		E_ASSERT(false && "Unknown reason type");
 	}
 };

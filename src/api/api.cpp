@@ -7,7 +7,9 @@
 
 #include <cef_v8.h>
 #include <utility>
+#ifdef _WIN32
 #include <winerror.h>
+#endif
 
 namespace Extendify::api {
 	log::Logger logger({"Extendify", "api"});
@@ -155,7 +157,8 @@ err:
 		return ret;
 	}
 
-	[[nodiscard]] constexpr std::string APIUsage::makeUsageString(const APIFunction& func) noexcept {
+	[[nodiscard]] constexpr std::string
+	APIUsage::makeUsageString(const APIFunction& func) noexcept {
 		if (func.name.empty()) {
 			return "unknown usage";
 		}
@@ -183,7 +186,8 @@ err:
 
 	[[nodiscard]] constexpr std::vector<std::string>
 	APIUsage::typesToString(const std::vector<uint64_t>& types) noexcept {
-		#warning todo
+		return util::iter::map(
+			types, [](uint64_t type) -> std::string { return stringifyUnionType(type); });
 	}
 
 	[[nodiscard]] constexpr std::string APIUsage::stringifyUnionType(uint64_t type) noexcept {
@@ -191,7 +195,7 @@ err:
 			return {};
 		}
 		std::vector<V8Type> types;
-		for (auto i = 1ULL; i < 2ULL << 62 && type; i <<= 1) {
+		for (auto i = 1ULL; i < 1ULL << 63 && type; i <<= 1) {
 			if (type & i) {
 				type &= ~i;
 				types.push_back(static_cast<V8Type>(i));

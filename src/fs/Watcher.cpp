@@ -2,6 +2,7 @@
 
 #include "log/Logger.hpp"
 #include "util/TaskCBHandler.hpp"
+#include "log/log.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -54,8 +55,7 @@ static constexpr Watcher::Reason reasonFromAction(DWORD action) {
 		case FILE_ACTION_RENAMED_NEW_NAME:
 			return Watcher::Reason::RENAMED_NEW_NAME;
 		default:
-			assert(false && "Unknown action type");
-			std::unreachable();
+			E_ASSERT(false && "Unknown action type");
 	}
 }
 #endif
@@ -186,8 +186,8 @@ void Watcher::Dir::watch() {
 };
 
 int Watcher::Dir::addFile(const std::filesystem::path& path, const Callback& callback) {
-	assert(!path.empty() && "Path cannot be empty");
-	assert(callback != nullptr && "Callback cannot be null");
+	E_ASSERT(!path.empty() && "Path cannot be empty");
+	E_ASSERT(callback != nullptr && "Callback cannot be null");
 	if (path != baseDir && path.parent_path() != baseDir) {
 		throw std::invalid_argument(
 			std::format("Path must be a direct child of the base dir or the "
@@ -273,7 +273,7 @@ void Watcher::Dir::removeFile(int id) {
 			auto _entry = toProcess.erase(toProcess.begin());
 			auto event = std::move(_entry->first);
 			auto callback = std::move(_entry->second);
-			assert(callback != nullptr && "Callback cannot be null");
+			E_ASSERT(callback != nullptr && "Callback cannot be null");
 			try {
 				callback(std::move(event));
 			} catch (std::exception& e) {

@@ -24,9 +24,8 @@ namespace Extendify::fs {
 	 * @brief opens a path in the users default application
 	 * 
 	 * @param path the path to open
-	 * @param workingDir the working directory to use
 	 * 
 	 * @return true if an error occurred, false otherwise
 	 */
-	bool openPath(const std::filesystem::path& path, std::optional<const std::filesystem::path*> workingDir);
+	bool openPath(const std::filesystem::path& path);
 } // namespace Extendify::fs

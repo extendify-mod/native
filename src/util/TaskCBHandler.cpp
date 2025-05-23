@@ -1,4 +1,5 @@
 #include "TaskCBHandler.hpp"
+#include "log/log.hpp"
 
 #include <utility>
 
@@ -15,7 +16,7 @@ namespace Extendify::util {
 	}
 
 	void TaskCBHandler::Execute() {
-		assert(handler);
+		E_ASSERT(handler);
 		handler();
 	}
 

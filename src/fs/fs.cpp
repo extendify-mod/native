@@ -1,11 +1,18 @@
 #include "fs.hpp"
 
+#include "util/TaskCBHandler.hpp"
+
 #include <cef_command_line.h>
+#include <cef_process_util.h>
+#include <cef_task.h>
 #include <filesystem>
 #include <fstream>
+#include <include/cef_task.h>
 #include <sstream>
+#ifdef _WIN32
 #include <utility>
 #include <winerror.h>
+#endif
 
 namespace Extendify::fs {
 	log::Logger logger({"Extendify", "fs"});
@@ -38,33 +45,16 @@ namespace Extendify::fs {
 
 	namespace {
 #ifdef __linux__
-		// Descriptions pulled from https://linux.die.net/man/1/xdg-open
-		std::string GetErrorDescription(int error_code) {
-			switch (error_code) {
-				case 1:
-					return "Error in command line syntax";
-				case 2:
-					return "The item does not exist";
-				case 3:
-					return "A required tool could not be found";
-				case 4:
-					return "The action failed";
-				default:
-					return "";
-			}
-		}
-
-		bool XDGUtil(const std::vector<std::string>& argv, const std::filesystem::path& workingDir,
-					 const bool waitForExit, const bool focusLaunchedProcess,
-					 const OpenCallback& callback) {
-			auto cli = CefCommandLine::CreateCommandLine();
-#warning TODO
+		bool XDGOpen(const std::filesystem::path& file) {
+			auto cmd = CefCommandLine::CreateCommandLine();
+			cmd->SetProgram("xdg-open");
+			cmd->AppendArgument(file.string());
+			CefTaskRunner::GetForThread(CefThreadId::TID_PROCESS_LAUNCHER)
+				->PostTask(util::TaskCBHandler::Create([cmd]() {
+					//
+					CefLaunchProcess(cmd);
+				}));
 			return false;
-		}
-
-		bool XDGOpen(const std::filesystem::path& working_dir, const std::string& fileName,
-					 const bool waitForExit, const OpenCallback& callback) {
-			return XDGUtil({"xdg-open", fileName}, working_dir, waitForExit, true, callback);
 		}
 #elif defined(_WIN32)
 		constexpr bool winIsExecutableExtension(const std::string& ext) {
@@ -125,8 +115,7 @@ namespace Extendify::fs {
 				case SE_ERR_SHARE:
 					return "A sharing violation occurred.";
 				default:
-					assert(false && "Unknown error code");
-					std::unreachable();
+					E_ASSERT(false && "Unknown error code");
 			}
 		}
 
@@ -134,11 +123,9 @@ namespace Extendify::fs {
 		 * @brief Opens a file in Windows.
 		 *
 		 * @param file The file to open.
-		 * @param workingDir The working directory.
 		 * @return false if the file was opened successfully, true otherwise.
 		 */
-		bool openPathWin(const std::filesystem::path& file,
-						 std::optional<const std::filesystem::path*> workingDir) {
+		bool openPathWin(const std::filesystem::path& file) {
 			if (winHasExecutableExtension(file)) [[unlikely]] {
 				logger.warn("Attempting to open an executable file: {}", file.string());
 				return true;
@@ -149,7 +136,7 @@ namespace Extendify::fs {
 									   L"open",
 									   file.wstring().c_str(),
 									   nullptr,
-									   workingDir ? (**workingDir).wstring().c_str() : nullptr,
+									   nullptr,
 									   SW_SHOW);
 			if (ret <= 32) {
 				logger.error("ShellExecute failed: {}", getShellExecuteError(ret));
@@ -160,12 +147,11 @@ namespace Extendify::fs {
 #endif
 	} // namespace
 
-	bool openPath(const std::filesystem::path& path,
-				  std::optional<const std::filesystem::path*> workingDir) {
+	bool openPath(const std::filesystem::path& path) {
 #ifdef __linux__
-#warning todo
+		return XDGOpen(path);
 #elif defined(_WIN32)
-		return openPathWin(path, workingDir);
+		return openPathWin(path);
 #endif
 	};
 

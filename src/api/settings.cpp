@@ -22,8 +22,15 @@ namespace Extendify::api::settings {
 			.name = "set",
 			.description = "Set the settings object",
 			.path = "settings",
-			.expectedArgs = {V8Type::OBJECT | V8Type::NULL_TYPE},
+			.expectedArgs = {V8Type::OBJECT},
 			.returnType = V8Type::UNDEFINED,
+		}};
+		APIUsage getSettingsDir {APIFunction {
+			.name = "getSettingsDir",
+			.description = "Get the settings directory",
+			.path = "settings",
+			.expectedArgs = {},
+			.returnType = V8Type::STRING,
 		}};
 	} // namespace usage
 
@@ -47,7 +54,7 @@ namespace Extendify::api::settings {
 	static auto setHandler = CBHandler::Create([](CB_HANDLER_ARGS) {
 		try {
 			usage::set.validateOrThrow(arguments);
-			const auto obj = arguments[0];
+			const auto& obj = arguments[0];
 			const auto settingsString = util::json::stringify(obj);
 			writeSettingsFile(settingsString);
 
@@ -61,6 +68,7 @@ namespace Extendify::api::settings {
 	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	static auto getSettingsDirHandler = CBHandler::Create([](CB_HANDLER_ARGS) {
 		try {
+			usage::getSettingsDir.validateOrThrow(arguments);
 			const auto settingsPath = path::getConfigFilePath().parent_path();
 			const auto ret = CefV8Value::CreateString(settingsPath.string());
 			retval = ret;

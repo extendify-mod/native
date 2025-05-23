@@ -9,7 +9,6 @@
 #include <cef_base.h>
 #include <cef_v8.h>
 #include <exception>
-#include <optional>
 
 using namespace Extendify;
 using namespace api;
@@ -23,9 +22,49 @@ static CefRefPtr<CefV8Context> themeChangeContext = nullptr;
 namespace Extendify::api::quickCss {
 	log::Logger logger({"Extendify", "api", "quickCss"});
 
+	namespace usage {
+		APIUsage get {APIFunction {
+			.name = "get",
+			.description = "Get the users quick css",
+			.path = "quickCss",
+			.expectedArgs = {},
+			.returnType = V8Type::STRING,
+		}};
+		APIUsage set {APIFunction {
+			.name = "set",
+			.description = "Set the users quick css",
+			.path = "quickCss",
+			.expectedArgs = {V8Type::STRING},
+			.returnType = V8Type::UNDEFINED,
+		}};
+		APIUsage addChangeListener {APIFunction {
+			.name = "addChangeListener",
+			.description = "Add a listener for quick css changes",
+			.path = "quickCss",
+			.expectedArgs = {V8Type::FUNCTION},
+			.returnType = V8Type::UNDEFINED,
+		}};
+		APIUsage addThemeChangeListener {APIFunction {
+			.name = "addThemeChangeListener",
+			.description =
+				"Add a listener for theme changes (files added or removed from the theme folder)",
+			.path = "quickCss",
+			.expectedArgs = {V8Type::FUNCTION},
+			.returnType = V8Type::UNDEFINED,
+		}};
+		APIUsage openFile {APIFunction {
+			.name = "openFile",
+			.description = "Open the quick css file in the default editor",
+			.path = "quickCss",
+			.expectedArgs = {},
+			.returnType = V8Type::UNDEFINED,
+		}};
+	} // namespace usage
+
 	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	static auto getHandler = CBHandler::Create([](CB_HANDLER_ARGS) {
 		try {
+			usage::get.validateOrThrow(arguments);
 			auto css = readQuickCssFile();
 			retval = CefV8Value::CreateString(css);
 		} catch (std::exception& e) {
@@ -41,14 +80,7 @@ namespace Extendify::api::quickCss {
 		[](const CefString& name, CefRefPtr<CefV8Value> object, const CefV8ValueList& arguments,
 		   CefRefPtr<CefV8Value>& retval, CefString& exception) {
 			try {
-				if (arguments.size() != 1) {
-					throw std::runtime_error(std::format(
-						"requires exactly 1 string argument, got {}", arguments.size()));
-				}
-				if (!arguments[0]->IsString()) {
-					throw std::runtime_error(std::format(
-						"requires exactly 1 string argument, got {}", getTypeName(arguments[0])));
-				}
+				usage::set.validateOrThrow(arguments);
 				const auto content = arguments[0]->GetStringValue();
 				writeQuickCssFile(content);
 				dispatchQuickCssUpdate(content);
@@ -65,14 +97,7 @@ namespace Extendify::api::quickCss {
 		[](const CefString& name, CefRefPtr<CefV8Value> object, const CefV8ValueList& arguments,
 		   CefRefPtr<CefV8Value>& retval, CefString& exception) {
 			try {
-				if (arguments.size() != 1) {
-					throw std::runtime_error("requires exactly one function argument");
-				}
-				if (!arguments[0]->IsFunction()) {
-					throw std::runtime_error(
-						std::format("requires exactly one function argument, got: {}",
-									getTypeName(arguments[0])));
-				}
+				usage::addChangeListener.validateOrThrow(arguments);
 				const auto currentContext = CefV8Context::GetCurrentContext();
 				if (!quickCssContext) {
 					quickCssContext = currentContext;
@@ -95,8 +120,24 @@ namespace Extendify::api::quickCss {
 		// NOLINTNEXTLINE(performance-unnecessary-value-param)
 		[](const CefString& name, CefRefPtr<CefV8Value> object, const CefV8ValueList& arguments,
 		   CefRefPtr<CefV8Value>& retval, CefString& exception) {
-#warning TODO
-			exception = "TODO";
+			try {
+				usage::addThemeChangeListener.validateOrThrow(arguments);
+				const auto currentContext = CefV8Context::GetCurrentContext();
+				if (!themeChangeContext) {
+					themeChangeContext = currentContext;
+				} else if (!themeChangeContext->IsSame(currentContext)) {
+					logger.error(
+						"Saved theme change context is not the same as the entered one while "
+						"adding a listener, invalidating all previous listeners and using "
+						"the current context");
+					themeChangeListeners.clear();
+					themeChangeContext = currentContext;
+				}
+			} catch (std::exception& e) {
+				const auto msg = std::format("Error adding theme change listener: {}", e.what());
+				logger.error(msg);
+				exception = msg;
+			}
 			return true;
 			;
 		});
@@ -106,6 +147,7 @@ namespace Extendify::api::quickCss {
 		[](const CefString& name, CefRefPtr<CefV8Value> object, const CefV8ValueList& arguments,
 		   CefRefPtr<CefV8Value>& retval, CefString& exception) {
 			try {
+				usage::openFile.validateOrThrow(arguments);
 				openQuickCssFile();
 			} catch (std::exception& e) {
 				const auto msg = std::format("Error opening file: {}", e.what());
@@ -154,7 +196,7 @@ namespace Extendify::api::quickCss {
 	}
 
 	void openQuickCssFile() {
-		fs::openPath(path::getQuickCssFile(true), std::nullopt);
+		fs::openPath(path::getQuickCssFile(true));
 	};
 
 	void dispatchQuickCssUpdate() {
