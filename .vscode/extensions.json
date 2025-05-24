@@ -2,6 +2,10 @@
     "recommendations": [
         "ms-vscode.cmake-tools",
         "ms-vscode.cpptools",
-        "pierre-payen.gdb-syntax"
+        "pierre-payen.gdb-syntax",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "streetsidesoftware.code-spell-checker",
+        "mkhl.direnv",
+        "editorconfig.editorconfig"
     ]
 }

@@ -1,5 +1,6 @@
 {
     "cmake.generator": "Unix Makefiles",
+    "C_Cpp.intelliSenseEngine": "disabled",
     "cSpell.words": [
         "alsa",
         "appindicator",
