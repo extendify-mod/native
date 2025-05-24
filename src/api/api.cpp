@@ -1,5 +1,6 @@
 #include "api.hpp"
 
+#include "api/quickCss.hpp"
 #include "log/log.hpp"
 #include "settings.hpp"
 #include "util/iter.hpp"
@@ -20,6 +21,8 @@ namespace Extendify::api {
 		CefRefPtr<CefV8Value> extendify = CefV8Value::CreateObject(nullptr, nullptr);
 
 		extendify->SetValue("settings", settings::makeApi(), V8_PROPERTY_ATTRIBUTE_NONE);
+
+		extendify->SetValue("quickCss", quickCss::makeApi(), V8_PROPERTY_ATTRIBUTE_NONE);
 
 		global->SetValue("extendify", extendify, V8_PROPERTY_ATTRIBUTE_NONE);
 	}

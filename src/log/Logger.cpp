@@ -82,8 +82,7 @@ void Logger::addToAll() {
 
 void Logger::removeFromAll() {
 	const auto pos = std::find(allLoggers.begin(), allLoggers.end(), this);
-	if (pos == allLoggers.end()) {
-		throw std::runtime_error("Logger not in allLoggers, this should not happen");
+	if (pos != allLoggers.end()) {
+		allLoggers.erase(pos);
 	}
-	allLoggers.erase(pos);
 }
