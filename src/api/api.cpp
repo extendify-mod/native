@@ -24,7 +24,7 @@ namespace Extendify::api {
 
 		extendify->SetValue("quickCss", quickCss::makeApi(), V8_PROPERTY_ATTRIBUTE_NONE);
 
-		global->SetValue("extendify", extendify, V8_PROPERTY_ATTRIBUTE_NONE);
+		global->SetValue("ExtendifyNative", extendify, V8_PROPERTY_ATTRIBUTE_NONE);
 	}
 
 	[[nodiscard]] V8Type getV8Type(const CefRefPtr<CefV8Value>& value) {
@@ -46,8 +46,6 @@ namespace Extendify::api {
 			return V8Type::DATE;
 		} else if (value->IsString()) {
 			return V8Type::STRING;
-		} else if (value->IsObject()) {
-			return V8Type::OBJECT;
 		} else if (value->IsArray()) {
 			return V8Type::ARRAY;
 		} else if (value->IsArrayBuffer()) {
@@ -56,6 +54,8 @@ namespace Extendify::api {
 			return V8Type::FUNCTION;
 		} else if (value->IsPromise()) {
 			return V8Type::PROMISE;
+		} else if (value->IsObject()) {
+			return V8Type::OBJECT;
 		}
 		E_ASSERT(false && "Unknown V8 value type");
 	};
@@ -96,17 +96,25 @@ namespace Extendify::api {
 		E_ASSERT(false && "Unknown v8 type");
 	}
 
-	APIUsage::APIUsage():
-		usageString("unknown usage") {
-	}
-
 	[[nodiscard]] APIUsage::APIUsage(APIFunction func):
-		func(std::move(func)),
-		usageString(makeUsageString(this->func)) {
+		func(std::move(func)) {
 	}
 
 	[[nodiscard]] constexpr std::string APIUsage::getUsage() const noexcept {
-		return usageString;
+		if (func.name.empty()) {
+			return "unknown usage";
+		}
+		std::ostringstream ret;
+		if (!func.path.empty()) {
+			ret << func.path << "#";
+		}
+		ret << func.name << "(";
+		const auto args = typesToString(func.expectedArgs);
+		ret << util::string::join(args, ", ") << ")";
+		if (func.returnType) {
+			ret << ": " << stringifyUnionType(*func.returnType);
+		}
+		return ret.str();
 	}
 
 	void APIUsage::validateOrThrow(const CefV8ValueList& arguments) const noexcept(false) {
@@ -153,25 +161,6 @@ err:
 													  return getTypeName(getV8Type(arg));
 												  }),
 								  ", ");
-		ret += ")";
-		if (func.returnType) {
-			ret += ": " + stringifyUnionType(*func.returnType);
-		}
-		return ret;
-	}
-
-	[[nodiscard]] constexpr std::string
-	APIUsage::makeUsageString(const APIFunction& func) noexcept {
-		if (func.name.empty()) {
-			return "unknown usage";
-		}
-		std::string ret;
-		if (!func.path.empty()) {
-			ret += func.path + "#";
-		}
-		ret += func.name + "(";
-		const auto args = typesToString(func.expectedArgs);
-		ret += util::string::join(args, ", ");
 		ret += ")";
 		if (func.returnType) {
 			ret += ": " + stringifyUnionType(*func.returnType);

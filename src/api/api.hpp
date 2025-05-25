@@ -72,7 +72,6 @@ namespace Extendify::api {
 
 	class APIUsage {
 	  public:
-		APIUsage();
 		// NOLINTNEXTLINE(google-explicit-constructor)
 		[[nodiscard]] APIUsage(APIFunction func);
 
@@ -86,16 +85,16 @@ namespace Extendify::api {
 		[[nodiscard]] std::string
 		makeActualUsageString(const CefV8ValueList& arguments) const noexcept;
 
-		[[nodiscard]] constexpr static std::string
+		[[nodiscard]] static std::string
 		makeUsageString(const APIFunction& func) noexcept;
 
 		/**
 		 * @brief converts a vector of V8Type to a vector of strings for each type
-		 * 
+		 *
 		 * does not accept union types
-		 * 
+		 *
 		 * @param types the types to convert
-		 * @return std::vector<std::string> 
+		 * @return std::vector<std::string>
 		 */
 		[[nodiscard]] constexpr static std::vector<std::string>
 		typesToString(const std::vector<V8Type>& types) noexcept;
@@ -106,7 +105,6 @@ namespace Extendify::api {
 		[[nodiscard]] constexpr static std::string stringifyUnionType(uint64_t type) noexcept;
 
 	  private:
-		const std::string usageString;
 		const APIFunction func;
 	};
 
