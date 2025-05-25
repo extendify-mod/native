@@ -42,7 +42,7 @@
       "args": [
         "--single-process"
       ],
-      "stopAtEntry": true,
+      "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
       "windows": {
         "environment": [
