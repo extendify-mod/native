@@ -1,8 +1,9 @@
 #pragma once
-#include "log/Logger.hpp"
 #include "log/log.hpp"
+#include "log/Logger.hpp"
 
 #include <atomic>
+#include <cef_thread.h>
 #include <deque>
 #include <filesystem>
 #include <format>
@@ -11,11 +12,11 @@
 #include <memory>
 #include <unordered_map>
 #include <utility>
-#include <cef_thread.h>
 
 namespace Extendify::fs {
 	class Watcher final {
 	  public:
+		static std::shared_ptr<Watcher> get();
 		enum class Reason {
 			ADDED,
 			REMOVED,
@@ -35,13 +36,14 @@ namespace Extendify::fs {
 		};
 
 		Watcher();
-		~Watcher();
-		typedef std::function<void(std::unique_ptr<const Event>)> Callback;
+		typedef std::function<void(std::unique_ptr<Event>)> Callback;
 		/**
 		 * @brief Adds a file to the watcher
 		 *
 		 * @param path the file path to be watched
 		 * @param callback the callback to be called when the file is changed/created/deleted
+		 * **The callback will be called on the watcher thread**, wrap with something that posts a
+		 * task if you need to run it on any other thread
 		 * @return a unique, non-negative, non-zero id for this file/callback pair, use it to remove
 		 * the watcher
 		 */

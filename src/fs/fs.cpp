@@ -1,16 +1,20 @@
 #include "fs.hpp"
 
+#include "log/log.hpp"
 #include "util/TaskCBHandler.hpp"
 
 #include <cef_command_line.h>
 #include <cef_process_util.h>
 #include <cef_task.h>
+#include <cef_thread.h>
 #include <filesystem>
 #include <fstream>
 #include <include/cef_task.h>
+#include <include/internal/cef_types.h>
+#include <objbase.h>
 #include <sstream>
+
 #ifdef _WIN32
-#include <utility>
 #include <winerror.h>
 #endif
 
@@ -125,33 +129,33 @@ namespace Extendify::fs {
 		 * @param file The file to open.
 		 * @return false if the file was opened successfully, true otherwise.
 		 */
-		bool openPathWin(const std::filesystem::path& file) {
+		void openPathWin(const std::filesystem::path& file) {
 			if (winHasExecutableExtension(file)) [[unlikely]] {
 				logger.warn("Attempting to open an executable file: {}", file.string());
-				return true;
+				return;
 			}
 			// https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shellexecutew#return-value
-			INT_PTR ret =
-				(INT_PTR)ShellExecuteW(nullptr,
-									   L"open",
-									   file.wstring().c_str(),
-									   nullptr,
-									   nullptr,
-									   SW_SHOW);
+			INT_PTR ret = (INT_PTR)ShellExecuteW(nullptr,
+												 nullptr,
+												 file.wstring().c_str(),
+												 nullptr,
+												 nullptr,
+												 // file.parent_path().wstring().c_str(),
+												 SW_SHOWNORMAL);
 			if (ret <= 32) {
 				logger.error("ShellExecute failed: {}", getShellExecuteError(ret));
-				return true;
+			} else {
+				logger.debug("done");
 			}
-			return false;
 		}
 #endif
 	} // namespace
 
-	bool openPath(const std::filesystem::path& path) {
+	void openPath(const std::filesystem::path& path) {
 #ifdef __linux__
-		return XDGOpen(path);
+		XDGOpen(path);
 #elif defined(_WIN32)
-		return openPathWin(path);
+		openPathWin(path);
 #endif
 	};
 

@@ -2,6 +2,7 @@
 
 #include "api/api.hpp"
 #include "fs/fs.hpp"
+#include "fs/Watcher.hpp"
 #include "log/Logger.hpp"
 #include "path/path.hpp"
 #include "util/TaskCBHandler.hpp"
@@ -9,6 +10,7 @@
 #include <cef_base.h>
 #include <cef_v8.h>
 #include <exception>
+#include <memory>
 
 using namespace Extendify;
 using namespace api;
@@ -83,7 +85,7 @@ namespace Extendify::api::quickCss {
 				usage::set.validateOrThrow(arguments);
 				const auto content = arguments[0]->GetStringValue();
 				writeQuickCssFile(content);
-				dispatchQuickCssUpdate(content);
+				// we dont need to dispatch an update here, as the file watcher will
 			} catch (std::exception& e) {
 				const auto msg = std::format("Error writing quick CSS file: {}", e.what());
 				logger.error(msg);
@@ -108,6 +110,9 @@ namespace Extendify::api::quickCss {
 					quickCssChangeListeners.clear();
 					quickCssContext = currentContext;
 				}
+				quickCssChangeListeners.push_back(arguments[0]);
+				logger.debug("Added quick css change listener, total listeners: {}",
+							 quickCssChangeListeners.size());
 			} catch (std::exception& e) {
 				const auto msg = std::format("Error adding change listener: {}", e.what());
 				logger.error(msg);
@@ -133,6 +138,9 @@ namespace Extendify::api::quickCss {
 					themeChangeListeners.clear();
 					themeChangeContext = currentContext;
 				}
+				themeChangeListeners.push_back(arguments[0]);
+				logger.debug("Added theme change listener, total listeners: {}",
+							 themeChangeListeners.size());
 			} catch (std::exception& e) {
 				const auto msg = std::format("Error adding theme change listener: {}", e.what());
 				logger.error(msg);
@@ -184,6 +192,15 @@ namespace Extendify::api::quickCss {
 			CefV8Value::CreateFunction("openEditor", openFileHandler);
 		api->SetValue("openEditor", openEditorFunc, V8_PROPERTY_ATTRIBUTE_NONE);
 
+		static std::optional<int> watcherId = {};
+		if (!watcherId) {
+			watcherId = fs::Watcher::get()->addFile(
+				path::getQuickCssFile(), [](std::unique_ptr<fs::Watcher::Event> event) {
+					logger.debug("change in quick css file; dispatching update");
+					dispatchQuickCssUpdate();
+				});
+		}
+
 		return api;
 	}
 
@@ -204,25 +221,30 @@ namespace Extendify::api::quickCss {
 	};
 
 	void dispatchQuickCssUpdate(const std::string& contents) {
-		if (!quickCssContext) {
-			logger.warn("attempting to dispatch a quick css update before any listeners are setup");
-			return;
-		}
-		if (!quickCssContext->IsValid()) {
-			logger.error("quick css context is not valid");
-			return;
-		}
-		quickCssContext->GetTaskRunner()->PostTask(
-			util::TaskCBHandler::Create([contents]() -> void {
-				for (const auto& cb : quickCssChangeListeners) {
-					if (!cb->IsFunction()) {
-						logger.warn("cb in quick css change listeners that is not a function, this "
-									"should never happen");
-						continue;
-					}
-					cb->ExecuteFunctionWithContext(
-						quickCssContext, nullptr, {CefV8Value::CreateString(contents)});
+		CefTaskRunner::GetForThread(CefThreadId::TID_RENDERER)
+			->PostTask(util::TaskCBHandler::Create([contents]() {
+				if (!quickCssContext) {
+					logger.warn(
+						"attempting to dispatch a quick css update before any listeners are setup");
+					return;
 				}
+				if (!quickCssContext->IsValid()) {
+					logger.error("quick css context is not valid");
+					return;
+				}
+				quickCssContext->GetTaskRunner()->PostTask(
+					util::TaskCBHandler::Create([contents]() -> void {
+						for (const auto& cb : quickCssChangeListeners) {
+							if (!cb->IsFunction()) {
+								logger.warn(
+									"cb in quick css change listeners that is not a function, this "
+									"should never happen");
+								continue;
+							}
+							cb->ExecuteFunctionWithContext(
+								quickCssContext, nullptr, {CefV8Value::CreateString(contents)});
+						}
+					}));
 			}));
 	}
 

@@ -1,10 +1,11 @@
 #include "Watcher.hpp"
 
+#include "log/log.hpp"
 #include "log/Logger.hpp"
 #include "util/TaskCBHandler.hpp"
-#include "log/log.hpp"
 
 #include <algorithm>
+#include <basetsd.h>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
@@ -24,6 +25,11 @@ static constexpr DWORD events = FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE
 #endif
 
 log::Logger Watcher::logger({"Extendify", "fs", "Watcher"});
+
+std::shared_ptr<Watcher> Extendify::fs::Watcher::get() {
+	static std::shared_ptr<Watcher> watcher = std::make_shared<Watcher>();
+	return watcher;
+};
 
 void Watcher::init() {
 	if (running) {
@@ -87,6 +93,7 @@ int Watcher::addFile(const std::filesystem::path& path, const Callback& callback
 	if (callback == nullptr) {
 		throw std::invalid_argument("Callback cannot be null");
 	}
+	logger.trace(std::format("Adding file to watcher: {}", path.string()));
 	auto dirname = path.parent_path();
 
 #ifdef _WIN32
@@ -124,7 +131,7 @@ int Watcher::addFile(const std::filesystem::path& path, const Callback& callback
 		{
 			std::scoped_lock lock(pendingEventsMutex, dirsMutex);
 			if (!dirs.contains(*dirPath)) {
-				logger.warn("No directory registered for {}, ignoring it", dirPath->string());
+				logger.warn(L"No directory registered for {}, ignoring it", dirPath->wstring());
 				continue;
 			}
 			const auto& dir = dirs[*dirPath];
@@ -133,8 +140,9 @@ int Watcher::addFile(const std::filesystem::path& path, const Callback& callback
 			do {
 				const auto cur = (FILE_NOTIFY_INFORMATION*)(data + offset);
 				const auto reason = reasonFromAction(cur->Action);
-				std::filesystem::path filename(
-					{cur->FileName, cur->FileNameLength / sizeof(WCHAR)});
+				// the filename is relative, not absolute
+				std::filesystem::path filename(dir->baseDir);
+				filename /= {{cur->FileName, cur->FileNameLength / sizeof(WCHAR)}};
 				pendingEvents.emplace_back(std::move(filename), reason);
 				offset += cur->NextEntryOffset;
 			} while (offset);
@@ -168,7 +176,8 @@ Watcher::Dir::Dir(std::filesystem::path baseDir, HANDLE onChange):
 			std::format("Error opening base dir {}: {}", this->baseDir.string(), GetLastError()));
 	}
 	baseDirHandle = _baseDirHandle;
-	if (nullptr == CreateIoCompletionPort(baseDirHandle, onChange, (ULONG_PTR)&baseDir, 0)) {
+	if (nullptr
+		== CreateIoCompletionPort(baseDirHandle, onChange, (ULONG_PTR) & this->baseDir, 0)) {
 		throw std::runtime_error(
 			std::format("Error creating IO completion port: {}", GetLastError()));
 	}
@@ -265,21 +274,28 @@ void Watcher::Dir::removeFile(int id) {
 							"Recieved event for path {} but no id registered for it, ignoring it",
 							path.string());
 					}
+				} else {
+					logger.warn(
+						"Recieved event for path {} but no directory registered for it, ignoring it",
+						path.string());
 				}
 			}
 			pendingEvents.clear();
 		}
 		while (!toProcess.empty()) {
-			auto _entry = toProcess.erase(toProcess.begin());
+			auto _entry = toProcess.begin();
 			auto event = std::move(_entry->first);
-			auto callback = std::move(_entry->second);
+			auto callback = _entry->second;
 			E_ASSERT(callback != nullptr && "Callback cannot be null");
 			try {
-				callback(std::move(event));
+				logger.trace(std::format("dispatching fs watcher event: {}", event));
+				callback(std::make_unique<Event>(*event));
+				logger.trace(std::format("dispatched fs watcher event: {}", event));
 			} catch (std::exception& e) {
 				logger.error(
 					std::format("Error occurred while processing {}, {}", event, e.what()));
 			}
+			toProcess.erase(_entry);
 		}
 		// wait for next event
 		WaitForSingleObjectEx(hasEvents, INFINITE, true);
