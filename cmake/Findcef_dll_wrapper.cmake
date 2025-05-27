@@ -84,5 +84,6 @@ elseif (WIN32)
     find_package_handle_standard_args(cef_dll_wrapper REQUIRED_VARS cef_dll_wrapper_LIBRARY)
 
     add_library(libcef_dll_wrapper STATIC IMPORTED)
+    add_dependencies(libcef_dll_wrapper cef_dll_wrapper)
     set_property(TARGET libcef_dll_wrapper PROPERTY IMPORTED_LOCATION "${cef_dll_wrapper_LIBRARY}")
 endif ()
