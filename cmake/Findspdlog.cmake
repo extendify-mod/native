@@ -7,6 +7,7 @@ FetchContent_Declare(
         spdlog
         SOURCE_DIR ${PROJECT_SOURCE_DIR}/deps/spdlog
 )
+set(SPDLOG_USE_STD_FORMAT ON)
 
 FetchContent_MakeAvailable(spdlog)
 # needed because libcef_dll_wrapper disables it for sandbox

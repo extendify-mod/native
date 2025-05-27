@@ -93,7 +93,7 @@ int Watcher::addFile(const std::filesystem::path& path, const Callback& callback
 	if (callback == nullptr) {
 		throw std::invalid_argument("Callback cannot be null");
 	}
-	logger.trace(std::format("Adding file to watcher: {}", path.string()));
+	logger.trace("Adding file to watcher: {}", path.string());
 	auto dirname = path.parent_path();
 
 #ifdef _WIN32
@@ -131,7 +131,7 @@ int Watcher::addFile(const std::filesystem::path& path, const Callback& callback
 		{
 			std::scoped_lock lock(pendingEventsMutex, dirsMutex);
 			if (!dirs.contains(*dirPath)) {
-				logger.warn(L"No directory registered for {}, ignoring it", dirPath->wstring());
+				logger.warn("No directory registered for {}, ignoring it", dirPath->string());
 				continue;
 			}
 			const auto& dir = dirs[*dirPath];
@@ -275,9 +275,9 @@ void Watcher::Dir::removeFile(int id) {
 							path.string());
 					}
 				} else {
-					logger.warn(
-						"Recieved event for path {} but no directory registered for it, ignoring it",
-						path.string());
+					logger.warn("Recieved event for path {} but no directory registered for it, "
+								"ignoring it",
+								path.string());
 				}
 			}
 			pendingEvents.clear();
@@ -288,12 +288,11 @@ void Watcher::Dir::removeFile(int id) {
 			auto callback = _entry->second;
 			E_ASSERT(callback != nullptr && "Callback cannot be null");
 			try {
-				logger.trace(std::format("dispatching fs watcher event: {}", event));
+				logger.trace("dispatching fs watcher event: {}", event);
 				callback(std::make_unique<Event>(*event));
-				logger.trace(std::format("dispatched fs watcher event: {}", event));
+				logger.trace("dispatched fs watcher event: {}", event);
 			} catch (std::exception& e) {
-				logger.error(
-					std::format("Error occurred while processing {}, {}", event, e.what()));
+				logger.error("Error occurred while processing {}, {}", event, e.what());
 			}
 			toProcess.erase(_entry);
 		}
