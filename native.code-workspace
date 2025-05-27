@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "deps/spdlog"
+		},
+		{
+			"path": "deps/wrapper"
+		}
+	],
+	"settings": {}
+}
