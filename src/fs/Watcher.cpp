@@ -12,6 +12,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <utility>
+#include <winnt.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -93,7 +94,7 @@ int Watcher::addFile(const std::filesystem::path& path, const Callback& callback
 	if (callback == nullptr) {
 		throw std::invalid_argument("Callback cannot be null");
 	}
-	logger.trace("Adding file to watcher: {}", path.string());
+	logger.info("Adding file to watcher: {}", path.string());
 	auto dirname = path.parent_path();
 
 #ifdef _WIN32
@@ -137,15 +138,16 @@ int Watcher::addFile(const std::filesystem::path& path, const Callback& callback
 			const auto& dir = dirs[*dirPath];
 			const auto& data = dir->buf;
 			int64_t offset = 0;
+			FILE_NOTIFY_INFORMATION* cur = nullptr;
 			do {
-				const auto cur = (FILE_NOTIFY_INFORMATION*)(data + offset);
+				cur = (FILE_NOTIFY_INFORMATION*)(data + offset);
 				const auto reason = reasonFromAction(cur->Action);
 				// the filename is relative, not absolute
 				std::filesystem::path filename(dir->baseDir);
 				filename /= {{cur->FileName, cur->FileNameLength / sizeof(WCHAR)}};
 				pendingEvents.emplace_back(std::move(filename), reason);
 				offset += cur->NextEntryOffset;
-			} while (offset);
+			} while (cur->NextEntryOffset);
 			dir->watch();
 		}
 		SetEvent(hasEvents);
@@ -282,6 +284,7 @@ void Watcher::Dir::removeFile(int id) {
 			}
 			pendingEvents.clear();
 		}
+		int processedEvents = 0;
 		while (!toProcess.empty()) {
 			auto _entry = toProcess.begin();
 			auto event = std::move(_entry->first);
@@ -290,12 +293,13 @@ void Watcher::Dir::removeFile(int id) {
 			try {
 				logger.trace("dispatching fs watcher event: {}", event);
 				callback(std::make_unique<Event>(*event));
-				logger.trace("dispatched fs watcher event: {}", event);
+				processedEvents++;
 			} catch (std::exception& e) {
 				logger.error("Error occurred while processing {}, {}", event, e.what());
 			}
 			toProcess.erase(_entry);
 		}
+		logger.debug("Processed {} events", processedEvents);
 		// wait for next event
 		WaitForSingleObjectEx(hasEvents, INFINITE, true);
 	}

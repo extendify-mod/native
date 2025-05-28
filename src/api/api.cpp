@@ -5,12 +5,16 @@
 #include "settings.hpp"
 #include "util/iter.hpp"
 #include "util/string.hpp"
+#include "util/TaskCBHandler.hpp"
+#include "util/util.hpp"
 
 #include <cef_v8.h>
+#include <cstddef>
+#include <include/cef_process_message.h>
+#include <include/internal/cef_types.h>
+#include <tuple>
+#include <type_traits>
 #include <utility>
-#ifdef _WIN32
-#include <winerror.h>
-#endif
 
 namespace Extendify::api {
 	log::Logger logger({"Extendify", "api"});
@@ -210,4 +214,74 @@ err:
 		handler = std::move(h);
 	}
 
+	ScopedV8Context::ScopedV8Context(CefRefPtr<CefV8Context> context):
+		id(nextId++),
+		context(std::move(context)) {
+		if (!this->context->IsValid()) {
+			E_ASSERT(false && "trying to use ScopedV8Context with an invalid context");
+		}
+		if (CefV8Context::GetEnteredContext()->IsSame(this->context)) {
+			shouldExit = false;
+		} else {
+			context->Enter();
+		}
+		logger.trace("Entering ScopedV8Context {}, shouldExit: {}", id, shouldExit);
+	}
+
+	ScopedV8Context::~ScopedV8Context() {
+		if (shouldExit) {
+			context->Exit();
+		}
+		logger.trace("Exiting ScopedV8Context {}, shouldExit: {}", id, shouldExit);
+	}
+
+	log::Logger ScopedV8Context::logger {{"Extendify", "api", "ScopedV8Context"}};
+	int ScopedV8Context::nextId = 1;
+
+	// NOLINTNEXTLINE(performance-unnecessary-value-param)
+	[[nodiscard]] CefRefPtr<CefV8Value> FilePicker::launch(CefRefPtr<CefV8Context> context,
+														   Callback callback) const {
+		ScopedV8Context ctx(context);
+		E_ASSERT(util::isOnProcess(PID_BROWSER)
+				 && "FilePicker can only be used in the browser process");
+
+		auto host = context->GetBrowser()->GetHost();
+		auto promise = CefV8Value::CreatePromise();
+		host->RunFileDialog(mode,
+							title,
+							defaultFilePath.string(),
+							util::iter::map(acceptFilters, util::into<CefString>),
+							FilePickerCallback::Create(context, promise, std::move(callback)));
+		return promise;
+	}
+
+	void
+	FilePicker::FilePickerCallback::OnFileDialogDismissed(const std::vector<CefString>& filePaths) {
+		E_ASSERT(callback && "FilePickerCallback called without a callback set");
+		callback(util::iter::map(filePaths, util::into<std::filesystem::path>));
+		CefTaskRunner::GetForThread(CefThreadId::TID_RENDERER)
+			->PostTask(util::TaskCBHandler::Create([context = context,
+													promise = promise,
+													callback = callback,
+													filePaths = filePaths]() {
+				E_ASSERT(context->IsValid() && "invalid context in FilePickerCallback");
+				ScopedV8Context ctx(context);
+				context->GetTaskRunner()->PostTask(util::TaskCBHandler::Create([=]() {
+					E_ASSERT(promise->IsValid() && "FilePickerCallback promise is not valid");
+					promise->ResolvePromise(
+						callback(util::iter::map(filePaths, util::into<std::filesystem::path>))
+							.value_or(CefV8Value::CreateUndefined()));
+				}));
+			}));
+	};
+
+	[[nodiscard]] CefRefPtr<FilePicker::FilePickerCallback>
+	FilePicker::FilePickerCallback::Create(CefRefPtr<CefV8Context> context,
+										   CefRefPtr<CefV8Value> promise, Callback callback) {
+		auto ret = new FilePickerCallback;
+		ret->callback = std::move(callback);
+		ret->promise = std::move(promise);
+		ret->context = std::move(context);
+		return ret;
+	}
 } // namespace Extendify::api

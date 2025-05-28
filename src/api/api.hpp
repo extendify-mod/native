@@ -1,11 +1,15 @@
 #pragma once
+#include "log/log.hpp"
 #include "log/Logger.hpp"
+#include "util/iter.hpp"
 
 #include <cef_base.h>
 #include <cef_callback.h>
 #include <cef_v8.h>
 #include <cstdint>
+#include <filesystem>
 #include <include/cef_base.h>
+#include <include/cef_browser.h>
 #include <include/internal/cef_ptr.h>
 #include <optional>
 #include <string>
@@ -85,8 +89,7 @@ namespace Extendify::api {
 		[[nodiscard]] std::string
 		makeActualUsageString(const CefV8ValueList& arguments) const noexcept;
 
-		[[nodiscard]] static std::string
-		makeUsageString(const APIFunction& func) noexcept;
+		[[nodiscard]] static std::string makeUsageString(const APIFunction& func) noexcept;
 
 		/**
 		 * @brief converts a vector of V8Type to a vector of strings for each type
@@ -108,6 +111,9 @@ namespace Extendify::api {
 		const APIFunction func;
 	};
 
+	template<typename... Args>
+	class CallbackManager { };
+
 	class CBHandler final: public CefV8Handler {
 	  public:
 		typedef std::function<bool(CB_HANDLER_ARGS)> Callback;
@@ -120,5 +126,80 @@ namespace Extendify::api {
 		void setCallback(Callback h);
 		Callback handler;
 		IMPLEMENT_REFCOUNTING(CBHandler);
+	};
+
+	class ScopedV8Context {
+	  public:
+		explicit ScopedV8Context(CefRefPtr<CefV8Context> context);
+
+		~ScopedV8Context();
+
+		ScopedV8Context() = delete;
+		ScopedV8Context(const ScopedV8Context& other) = delete;
+		ScopedV8Context(ScopedV8Context&& other) = delete;
+
+	  private:
+		static log::Logger logger;
+		static int nextId;
+		int id;
+		bool shouldExit = true;
+		CefRefPtr<CefV8Context> context;
+	};
+
+	class FilePicker {
+	  public:
+		typedef cef_file_dialog_mode_t FileDialogMode;
+		typedef std::function<std::optional<CefRefPtr<CefV8Value>>(
+			std::vector<std::filesystem::path>)>
+			Callback;
+		FileDialogMode mode = FileDialogMode::FILE_DIALOG_OPEN;
+		std::string title;
+		std::filesystem::path defaultFilePath;
+		// cursed comment becuase of /* in block comments
+
+		/**
+		 * used to restrict the selectable file types and may any combination of (a) valid */
+		/// lower-cased MIME types (e.g. "text/*" or "image/*"), (b) individual file extensions
+		/** (e.g. ".txt" or ".png"), or (c) combined description and file extension delimited using
+		 * "|" and
+		 * ";" (e.g. "Image Types|.png;.gif;.jpg").
+		 */
+		std::vector<std::string> acceptFilters;
+		/**
+		 * @brief runs the file picker dialog
+		 *
+		 * @param context the context that the promise will be created in
+		 * @param callback will be called once the user has selected files, will be called with the
+		 * path of each file/folder
+		 * @invariant context is valid for this thread
+		 * @return CefRefPtr<CefV8Value>
+		 */
+		[[nodiscard]] CefRefPtr<CefV8Value> launch(CefRefPtr<CefV8Context> context,
+												   Callback callback) const;
+		// utility functions that just use the default values
+
+		[[nodiscard]] static CefRefPtr<CefV8Value> pickOne(CefRefPtr<CefV8Context> context,
+														   Callback callback);
+		[[nodiscard]] static CefRefPtr<CefV8Value> pickMultiple(CefRefPtr<CefV8Context> context,
+																Callback callback);
+		[[nodiscard]] static CefRefPtr<CefV8Value> pickFolder(CefRefPtr<CefV8Context> context,
+															  Callback callback);
+		[[nodiscard]] static CefRefPtr<CefV8Value> pickSaveFile(CefRefPtr<CefV8Context> context,
+																Callback callback);
+
+	  private:
+		class FilePickerCallback final: public CefRunFileDialogCallback {
+		  public:
+			void OnFileDialogDismissed(const std::vector<CefString>& filePaths) override;
+			[[nodiscard]] static CefRefPtr<FilePickerCallback> Create(CefRefPtr<CefV8Context> context,
+																	  CefRefPtr<CefV8Value> promise,
+																	  Callback callback);
+
+		  private:
+			CefRefPtr<CefV8Value> promise;
+			CefRefPtr<CefV8Context> context;
+			Callback callback = nullptr;
+			IMPLEMENT_REFCOUNTING(FilePickerCallback);
+		};
 	};
 } // namespace Extendify::api

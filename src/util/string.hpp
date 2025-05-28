@@ -1,8 +1,9 @@
 #pragma once
 
 #include <ranges>
+#include <regex>
 #include <string>
-
+#include <vector>
 
 namespace Extendify::util::string {
 	template<typename T>
@@ -18,4 +19,28 @@ namespace Extendify::util::string {
 		ret.erase(ret.end() - delimiter.size(), ret.end());
 		return ret;
 	};
+
+	struct SplitOptions {
+		int limit = -1;
+		std::regex_constants::match_flag_type flags = std::regex_constants::match_default;
+	};
+
+	[[nodiscard]] std::vector<std::string> split(const std::string& str,
+												 const std::string& delimiter,
+												 const SplitOptions& opts = {}) noexcept;
+
+	[[nodiscard]] std::vector<std::string> split(const std::string& str,
+												 const std::basic_regex<char>& delimiter,
+												 const SplitOptions& opts = {});
+
+	void trimr(std::string& str) noexcept;
+	void triml(std::string& str) noexcept;
+
+	constexpr void trim(std::string& str) noexcept {
+		triml(str);
+		trimr(str);
+	};
+
+	void replace(std::string& str, const std::basic_regex<char>& regex,
+				 const std::string& replacement);
 } // namespace Extendify::util::string

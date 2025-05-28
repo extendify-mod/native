@@ -139,8 +139,7 @@ namespace Extendify::fs {
 												 nullptr,
 												 file.wstring().c_str(),
 												 nullptr,
-												 nullptr,
-												 // file.parent_path().wstring().c_str(),
+												 file.parent_path().wstring().c_str(),
 												 SW_SHOWNORMAL);
 			if (ret <= 32) {
 				logger.error("ShellExecute failed: {}", getShellExecuteError(ret));
