@@ -10,6 +10,8 @@ namespace Extendify::api::themes {
 
 	[[nodiscard]] CefRefPtr<CefV8Value> makeApi();
 
+	[[nodiscard]] bool themeExists(const std::string& fileName);
+
 	/*!
 	 * BetterDiscord addon meta parser
 	 * Copyright 2023 BetterDiscord contributors

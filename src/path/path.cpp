@@ -75,6 +75,19 @@ fs::path path::getQuickCssFile(bool createIfNeeded) {
 	return quickCssPath;
 }
 
+fs::path path::getThemesDir() {
+	return getThemesDir(false);
+}
+
+fs::path path::getThemesDir(bool createIfNeeded) {
+	const auto base = getBaseConfigDir(createIfNeeded);
+	auto themesPath = base / "themes";
+	if (createIfNeeded) {
+		ensureDir(themesPath);
+	}
+	return std::move(themesPath);
+}
+
 bool path::ensureDir(const std::filesystem::path& path) {
 	if (fs::exists(path)) {
 		logger.debug("Directory {} already exists", path.string());

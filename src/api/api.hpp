@@ -7,6 +7,7 @@
 #include <cef_callback.h>
 #include <cef_v8.h>
 #include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <include/cef_base.h>
 #include <include/cef_browser.h>
@@ -149,7 +150,7 @@ namespace Extendify::api {
 	class FilePicker {
 	  public:
 		typedef cef_file_dialog_mode_t FileDialogMode;
-		typedef std::function<std::optional<CefRefPtr<CefV8Value>>(
+		typedef std::function<std::expected<CefRefPtr<CefV8Value>, std::string>(
 			std::vector<std::filesystem::path>)>
 			Callback;
 		FileDialogMode mode = FileDialogMode::FILE_DIALOG_OPEN;
@@ -170,7 +171,7 @@ namespace Extendify::api {
 		 *
 		 * @param context the context that the promise will be created in
 		 * @param callback will be called once the user has selected files, will be called with the
-		 * path of each file/folder
+		 * path of each file/folder **WILL BE CALLED IN THE SAME CONTEXT PROVIDED**
 		 * @invariant context is valid for this thread
 		 * @return CefRefPtr<CefV8Value>
 		 */

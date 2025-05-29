@@ -24,25 +24,11 @@ namespace Extendify::util {
 		return false;
 	};
 
-	template<typename T, typename... Args>
-	[[nodiscard]] inline T into(Args&&... args) {
-		return T(std::forward<Args>(args)...);
-	}
-
-	namespace {
-
-		template<typename, typename = std::void_t<>>
-		struct hasTypeType: std::false_type { };
-
-		template<typename T>
-		struct hasTypeType<T, std::void_t<typename T::type>>: std::true_type { };
-
-		template<typename Func, typename... Args>
-		struct ReturnType_impl:
-			std::conditional<hasTypeType<std::invoke_result<Func, Args...>>::value,
-							 typename std::invoke_result<Func, Args...>,
-							 typename std::invoke_result<Func>> { };
-	} // namespace
-    template <typename Func, typename... Args>
-    using ReturnType = typename ReturnType_impl<Func, Args...>::type;
+	template<typename T>
+	struct into {
+		template<typename... Args>
+		static T operator()(Args&&... args) {
+			return T(std::forward<Args>(args)...);
+		}
+	};
 } // namespace Extendify::util

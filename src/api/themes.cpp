@@ -1,25 +1,151 @@
 #include "themes.hpp"
 
 #include "api.hpp"
+#include "path/path.hpp"
 #include "util/string.hpp"
 
+#include <cef_v8.h>
+#include <expected>
+#include <include/internal/cef_ptr.h>
 #include <regex>
+
+static CefV8ValueList themeChangeListeners {};
+static CefRefPtr<CefV8Context> themeChangeContext = nullptr;
 
 namespace Extendify::api::themes {
 	log::Logger logger({"Extendify", "api", "themes"});
-	
-	namespace usage {
-		APIUsage uploadTheme {APIFunction {
-			.name = "uploadTheme",
-			.description = "Prompts the user to upload a theme file",
-			.path = "themes",
 
+	namespace usage {
+		APIUsage uploadTheme {APIFunction {.name = "uploadTheme",
+										   .description = "Prompts the user to upload a theme file",
+										   .path = "themes",
+										   .expectedArgs = {},
+										   .returnType = V8Type::PROMISE}};
+		APIUsage deleteTheme {APIFunction {
+			.name = "deleteTheme",
+			.description = "Delete a theme by its file. The string should be the path to the theme "
+						   "file. Throws if the path is outside the theme directory.",
+			.path = "themes",
+			.expectedArgs = {V8Type::STRING},
+			.returnType = V8Type::PROMISE,
 		}};
-	}
+		APIUsage addThemeChangeListener {APIFunction {
+			.name = "addThemeChangeListener",
+			.description =
+				"Add a listener for theme changes (files added or removed from the theme folder)",
+			.path = "themes",
+			.expectedArgs = {V8Type::FUNCTION},
+			.returnType = V8Type::UNDEFINED,
+		}};
+		APIUsage getThemesDir {APIFunction {
+			.name = "getThemesDir",
+			.description = "Get the path to the themes directory",
+			.path = "themes",
+			.expectedArgs = {},
+			.returnType = V8Type::STRING,
+		}};
+		/**
+		 * @see UserTheme
+		 *
+		 * @returns array of UserTheme
+		 */
+		APIUsage getThemes {APIFunction {
+			.name = "getThemes",
+			.description = "Get the list of themes in the themes directory",
+			.path = "themes",
+			.expectedArgs = {},
+			.returnType = V8Type::ARRAY,
+		}};
+		APIUsage getThemeData {
+			APIFunction {.name = "getThemeData",
+						 .description = "Get the data for a theme by its filename",
+						 .path = "themes",
+						 .expectedArgs = {V8Type::STRING},
+						 .returnType = V8Type::OBJECT}};
+	} // namespace usage
+
+	static auto uploadThemeHandler = CBHandler::Create(
+		// NOLINTNEXTLINE(performance-unnecessary-value-param)
+		[](const CefString& name, CefRefPtr<CefV8Value> object, const CefV8ValueList& arguments,
+		   CefRefPtr<CefV8Value>& retval, CefString& exception) {
+			try {
+				usage::uploadTheme.validateOrThrow(arguments);
+				retval = FilePicker::pickOne(
+					CefV8Context::GetCurrentContext(),
+					[](std::vector<std::filesystem::path> pickedPath)
+						-> std::expected<CefRefPtr<CefV8Value>, std::string> {
+						if (pickedPath.empty()) {
+							constexpr auto msg = "No file was picked for upload";
+							logger.warn(msg);
+							return std::unexpected(msg);
+						}
+						const auto& path = pickedPath[0];
+						if (themeExists(path.filename().string())) {
+							const auto msg =
+								std::format("Theme with name {} already exists, not uploading",
+											path.filename().string());
+							logger.error(msg);
+							return std::unexpected(msg);
+						}
+						std::filesystem::copy_file(path,
+												   path::getThemesDir(true) / path.filename());
+						return CefV8Value::CreateUndefined();
+					});
+			} catch (std::exception& e) {
+				const auto msg = std::format("Error uploading theme: {}", e.what());
+				logger.error(msg);
+				exception = msg;
+			}
+			return true;
+		});
+
+	static auto addChangeListenerHandler = CBHandler::Create(
+		// NOLINTNEXTLINE(performance-unnecessary-value-param)
+		[](const CefString& name, CefRefPtr<CefV8Value> object, const CefV8ValueList& arguments,
+		   CefRefPtr<CefV8Value>& retval, CefString& exception) {
+			try {
+				usage::addThemeChangeListener.validateOrThrow(arguments);
+				const auto currentContext = CefV8Context::GetCurrentContext();
+				if (!themeChangeContext) {
+					themeChangeContext = currentContext;
+				} else if (!themeChangeContext->IsSame(currentContext)) {
+					logger.error(
+						"Saved theme change context is not the same as the entered one while "
+						"adding a listener, invalidating all previous listeners and using "
+						"the current context");
+					themeChangeListeners.clear();
+					themeChangeContext = currentContext;
+				}
+				themeChangeListeners.push_back(arguments[0]);
+				logger.debug("Added theme change listener, total listeners: {}",
+							 themeChangeListeners.size());
+			} catch (std::exception& e) {
+				const auto msg = std::format("Error adding theme change listener: {}", e.what());
+				logger.error(msg);
+				exception = msg;
+			}
+			return true;
+			;
+		});
 
 	[[nodiscard]] CefRefPtr<CefV8Value> makeApi() {
+		CefRefPtr<CefV8Value> api = CefV8Value::CreateObject(nullptr, nullptr);
 
+		CefRefPtr<CefV8Value> uploadThemeFunc =
+			CefV8Value::CreateFunction("uploadTheme", uploadThemeHandler);
+		api->SetValue("uploadTheme", uploadThemeFunc, V8_PROPERTY_ATTRIBUTE_NONE);
+
+		CefRefPtr<CefV8Value> addChangeListenerFunc =
+			CefV8Value::CreateFunction("addChangeListener", addChangeListenerHandler);
+		api->SetValue("addChangeListener", addChangeListenerFunc, V8_PROPERTY_ATTRIBUTE_NONE);
+
+		return api;
 	}
+
+	bool themeExists(const std::string& fileName) {
+		return std::filesystem::exists(path::getThemesDir() / fileName);
+	};
+
 	/*!
 	 * BetterDiscord addon meta parser
 	 * Copyright 2023 BetterDiscord contributors

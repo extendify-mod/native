@@ -1,26 +1,25 @@
 #include "api.hpp"
 
-#include "api/quickCss.hpp"
 #include "log/log.hpp"
+#include "quickCss.hpp"
 #include "settings.hpp"
+#include "themes.hpp"
 #include "util/iter.hpp"
 #include "util/string.hpp"
 #include "util/TaskCBHandler.hpp"
 #include "util/util.hpp"
 
 #include <cef_v8.h>
-#include <cstddef>
 #include <include/cef_process_message.h>
+#include <include/internal/cef_ptr.h>
 #include <include/internal/cef_types.h>
-#include <tuple>
-#include <type_traits>
 #include <utility>
 
 namespace Extendify::api {
 	log::Logger logger({"Extendify", "api"});
 
 	void inject(const CefRefPtr<CefV8Context>& context) {
-		logger.trace("Injecting API into context");
+		logger.info("Injecting ExtendifyNative API into V8 context");
 		CefRefPtr<CefV8Value> global = context->GetGlobal();
 		CefRefPtr<CefV8Value> extendify = CefV8Value::CreateObject(nullptr, nullptr);
 
@@ -28,7 +27,11 @@ namespace Extendify::api {
 
 		extendify->SetValue("quickCss", quickCss::makeApi(), V8_PROPERTY_ATTRIBUTE_NONE);
 
+		extendify->SetValue("themes", themes::makeApi(), V8_PROPERTY_ATTRIBUTE_NONE);
+
 		global->SetValue("ExtendifyNative", extendify, V8_PROPERTY_ATTRIBUTE_NONE);
+		global->SetValue(
+			"EXTENDIFY_NATIVE_AVAILABLE", CefV8Value::CreateBool(true), V8_PROPERTY_ATTRIBUTE_NONE);
 	}
 
 	[[nodiscard]] V8Type getV8Type(const CefRefPtr<CefV8Value>& value) {
@@ -245,20 +248,63 @@ err:
 		E_ASSERT(util::isOnProcess(PID_BROWSER)
 				 && "FilePicker can only be used in the browser process");
 
-		auto host = context->GetBrowser()->GetHost();
 		auto promise = CefV8Value::CreatePromise();
-		host->RunFileDialog(mode,
-							title,
-							defaultFilePath.string(),
-							util::iter::map(acceptFilters, util::into<CefString>),
-							FilePickerCallback::Create(context, promise, std::move(callback)));
+		CefTaskRunner::GetForThread(CefThreadId::TID_UI)
+			->PostTask(util::TaskCBHandler::Create([browser = context->GetBrowser(),
+													mode = mode,
+													title = title,
+													defaultFilePath = defaultFilePath,
+													acceptFilters = acceptFilters,
+													context,
+													promise,
+													callback]() {
+				auto host = browser->GetHost();
+				E_ASSERT(host != nullptr && "Browser host is null in FilePicker::launch");
+				host->RunFileDialog(
+					mode,
+					title,
+					defaultFilePath.string(),
+					util::iter::map(acceptFilters, util::into<CefString> {}),
+					FilePickerCallback::Create(context, promise, std::move(callback)));
+			}));
 		return promise;
+	}
+
+	[[nodiscard]] CefRefPtr<CefV8Value> FilePicker::pickOne(CefRefPtr<CefV8Context> context,
+															Callback callback) {
+		static FilePicker picker {
+			.mode = FileDialogMode::FILE_DIALOG_OPEN,
+		};
+		return picker.launch(context, std::move(callback));
+	}
+
+	[[nodiscard]] CefRefPtr<CefV8Value> FilePicker::pickMultiple(CefRefPtr<CefV8Context> context,
+																 Callback callback) {
+		static FilePicker picker {
+			.mode = FileDialogMode::FILE_DIALOG_OPEN_MULTIPLE,
+		};
+		return picker.launch(context, std::move(callback));
+	}
+
+	[[nodiscard]] CefRefPtr<CefV8Value> FilePicker::pickFolder(CefRefPtr<CefV8Context> context,
+															   Callback callback) {
+		static FilePicker picker {
+			.mode = FileDialogMode::FILE_DIALOG_OPEN_FOLDER,
+		};
+		return picker.launch(context, std::move(callback));
+	}
+
+	[[nodiscard]] CefRefPtr<CefV8Value> FilePicker::pickSaveFile(CefRefPtr<CefV8Context> context,
+																 Callback callback) {
+		static FilePicker picker {
+			.mode = FileDialogMode::FILE_DIALOG_SAVE,
+		};
+		return picker.launch(context, std::move(callback));
 	}
 
 	void
 	FilePicker::FilePickerCallback::OnFileDialogDismissed(const std::vector<CefString>& filePaths) {
 		E_ASSERT(callback && "FilePickerCallback called without a callback set");
-		callback(util::iter::map(filePaths, util::into<std::filesystem::path>));
 		CefTaskRunner::GetForThread(CefThreadId::TID_RENDERER)
 			->PostTask(util::TaskCBHandler::Create([context = context,
 													promise = promise,
@@ -267,10 +313,23 @@ err:
 				E_ASSERT(context->IsValid() && "invalid context in FilePickerCallback");
 				ScopedV8Context ctx(context);
 				context->GetTaskRunner()->PostTask(util::TaskCBHandler::Create([=]() {
+					E_ASSERT(context->IsValid() && "invalid context in FilePickerCallback");
+					ScopedV8Context ctx(context);
 					E_ASSERT(promise->IsValid() && "FilePickerCallback promise is not valid");
-					promise->ResolvePromise(
-						callback(util::iter::map(filePaths, util::into<std::filesystem::path>))
-							.value_or(CefV8Value::CreateUndefined()));
+					std::expected<scoped_refptr<CefV8Value>, std::basic_string<char>> ret;
+					try {
+						ret = callback(
+							util::iter::map(filePaths, util::into<std::filesystem::path> {}));
+					} catch (const std::exception& e) {
+						std::string msg = std::format("Error in FilePickerCallback: {}", e.what());
+						logger.error(msg);
+						ret = std::unexpected(msg);
+					}
+					if (ret.has_value()) {
+						promise->ResolvePromise(std::move(ret.value()));
+					} else {
+						promise->RejectPromise(ret.error());
+					}
 				}));
 			}));
 	};

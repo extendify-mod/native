@@ -12,6 +12,7 @@
 #include <include/cef_task.h>
 #include <include/internal/cef_types.h>
 #include <objbase.h>
+#include <processenv.h>
 #include <sstream>
 
 #ifdef _WIN32
@@ -133,6 +134,10 @@ namespace Extendify::fs {
 			if (winHasExecutableExtension(file)) [[unlikely]] {
 				logger.warn("Attempting to open an executable file: {}", file.string());
 				return;
+			}
+			// https://github.com/microsoft/vscode-cpptools/issues/13644
+			if (std::getenv("ELECTRON_RUN_AS_NODE") != nullptr) {
+				SetEnvironmentVariableA("ELECTRON_RUN_AS_NODE", nullptr);
 			}
 			// https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shellexecutew#return-value
 			INT_PTR ret = (INT_PTR)ShellExecuteW(nullptr,
