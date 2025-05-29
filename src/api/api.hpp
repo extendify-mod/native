@@ -1,23 +1,18 @@
 #pragma once
-#include "log/log.hpp"
 #include "log/Logger.hpp"
-#include "util/iter.hpp"
 
-#include <cef_base.h>
-#include <cef_callback.h>
+#include <cef_thread.h>
 #include <cef_v8.h>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
-#include <include/cef_base.h>
-#include <include/cef_browser.h>
-#include <include/internal/cef_ptr.h>
 #include <optional>
 #include <string>
 
-#define CB_HANDLER_ARGS                                                                   \
-	const CefString &name, CefRefPtr<CefV8Value> object, const CefV8ValueList &arguments, \
-		CefRefPtr<CefV8Value>&retval, CefString &exception
+#define CB_HANDLER_ARGS                                                \
+	const CefString &name, CefRefPtr<CefV8Value> object,               \
+		const CefV8ValueList &arguments, CefRefPtr<CefV8Value>&retval, \
+		CefString &exception
 
 namespace Extendify::api {
 	extern log::Logger logger;
@@ -82,7 +77,8 @@ namespace Extendify::api {
 
 		[[nodiscard]] constexpr std::string getUsage() const noexcept;
 
-		void validateOrThrow(const CefV8ValueList& arguments) const noexcept(false);
+		void validateOrThrow(const CefV8ValueList& arguments) const
+			noexcept(false);
 
 		[[nodiscard]] std::optional<std::string>
 		validateArgs(const CefV8ValueList& arguments) const noexcept;
@@ -90,10 +86,12 @@ namespace Extendify::api {
 		[[nodiscard]] std::string
 		makeActualUsageString(const CefV8ValueList& arguments) const noexcept;
 
-		[[nodiscard]] static std::string makeUsageString(const APIFunction& func) noexcept;
+		[[nodiscard]] static std::string
+		makeUsageString(const APIFunction& func) noexcept;
 
 		/**
-		 * @brief converts a vector of V8Type to a vector of strings for each type
+		 * @brief converts a vector of V8Type to a vector of strings for each
+		 * type
 		 *
 		 * does not accept union types
 		 *
@@ -106,7 +104,8 @@ namespace Extendify::api {
 		[[nodiscard]] constexpr static std::vector<std::string>
 		typesToString(const std::vector<uint64_t>& types) noexcept;
 
-		[[nodiscard]] constexpr static std::string stringifyUnionType(uint64_t type) noexcept;
+		[[nodiscard]] constexpr static std::string
+		stringifyUnionType(uint64_t type) noexcept;
 
 	  private:
 		const APIFunction func;
@@ -147,60 +146,67 @@ namespace Extendify::api {
 		CefRefPtr<CefV8Context> context;
 	};
 
-	class FilePicker {
+	/**
+	 * YOU ARE RESPONSIBLE FOR MAKING SURE THAT THIS LIVES LONGER THAN THE
+	 * PROMISE
+	 */
+	class FilePicker: public CefBaseRefCounted {
 	  public:
-		typedef cef_file_dialog_mode_t FileDialogMode;
+		enum class DialogType {
+			OPEN,
+			OPEN_FOLDER,
+			SAVE
+		};
 		typedef std::function<std::expected<CefRefPtr<CefV8Value>, std::string>(
 			std::vector<std::filesystem::path>)>
 			Callback;
-		FileDialogMode mode = FileDialogMode::FILE_DIALOG_OPEN;
-		std::string title;
-		std::filesystem::path defaultFilePath;
-		// cursed comment becuase of /* in block comments
 
-		/**
-		 * used to restrict the selectable file types and may any combination of (a) valid */
-		/// lower-cased MIME types (e.g. "text/*" or "image/*"), (b) individual file extensions
-		/** (e.g. ".txt" or ".png"), or (c) combined description and file extension delimited using
-		 * "|" and
-		 * ";" (e.g. "Image Types|.png;.gif;.jpg").
-		 */
-		std::vector<std::string> acceptFilters;
+		struct FilePickerData {
+			DialogType mode = DialogType::OPEN;
+			std::string title;
+			std::filesystem::path defaultFilePath;
+			std::vector<std::string> acceptFilters;
+		};
+
+		FilePicker() = delete;
+
+		[[nodiscard]] static CefRefPtr<FilePicker> Create(FilePickerData data);
+
 		/**
 		 * @brief runs the file picker dialog
 		 *
 		 * @param context the context that the promise will be created in
-		 * @param callback will be called once the user has selected files, will be called with the
-		 * path of each file/folder **WILL BE CALLED IN THE SAME CONTEXT PROVIDED**
+		 * @param callback will be called once the user has selected files, will
+		 * be called with the path of each file/folder **WILL BE CALLED IN THE
+		 * SAME CONTEXT PROVIDED**
 		 * @invariant context is valid for this thread
 		 * @return CefRefPtr<CefV8Value>
 		 */
-		[[nodiscard]] CefRefPtr<CefV8Value> launch(CefRefPtr<CefV8Context> context,
-												   Callback callback) const;
+		[[nodiscard]] CefRefPtr<CefV8Value>
+		launch(CefRefPtr<CefV8Context> context, Callback callback);
 		// utility functions that just use the default values
 
-		[[nodiscard]] static CefRefPtr<CefV8Value> pickOne(CefRefPtr<CefV8Context> context,
-														   Callback callback);
-		[[nodiscard]] static CefRefPtr<CefV8Value> pickMultiple(CefRefPtr<CefV8Context> context,
-																Callback callback);
-		[[nodiscard]] static CefRefPtr<CefV8Value> pickFolder(CefRefPtr<CefV8Context> context,
-															  Callback callback);
-		[[nodiscard]] static CefRefPtr<CefV8Value> pickSaveFile(CefRefPtr<CefV8Context> context,
-																Callback callback);
+		[[nodiscard]] static CefRefPtr<FilePicker> pickOne();
+		[[nodiscard]] static CefRefPtr<FilePicker> pickFolder();
+		[[nodiscard]] static CefRefPtr<FilePicker> pickSaveFile();
 
 	  private:
-		class FilePickerCallback final: public CefRunFileDialogCallback {
-		  public:
-			void OnFileDialogDismissed(const std::vector<CefString>& filePaths) override;
-			[[nodiscard]] static CefRefPtr<FilePickerCallback> Create(CefRefPtr<CefV8Context> context,
-																	  CefRefPtr<CefV8Value> promise,
-																	  Callback callback);
-
-		  private:
-			CefRefPtr<CefV8Value> promise;
-			CefRefPtr<CefV8Context> context;
-			Callback callback = nullptr;
-			IMPLEMENT_REFCOUNTING(FilePickerCallback);
-		};
+		// ctor
+		[[nodiscard]] explicit FilePicker(FilePickerData data);
+		// static
+		static log::Logger logger;
+		static int nextId;
+		// config
+		DialogType mode;
+		// impl
+		int id = nextId++;
+		Callback callback;
+		CefRefPtr<CefV8Value> promise;
+		CefRefPtr<CefV8Context> context;
+		CefRefPtr<CefThread> pickerThread;
+		void runFilePicker();
+		std::expected<std::optional<std::filesystem::path>, std::string>
+		showDialog();
+		IMPLEMENT_REFCOUNTING(FilePicker);
 	};
 } // namespace Extendify::api

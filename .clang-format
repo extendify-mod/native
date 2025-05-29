@@ -44,7 +44,7 @@ BreakBeforeBraces: Attach
 BreakConstructorInitializers: AfterColon
 BreakInheritanceList: AfterColon
 BreakTemplateDeclarations: Yes
-ColumnLimit:     100
+ColumnLimit:     80
 CommentPragmas:  '^ IWYU pragma:'
 ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4

@@ -55,5 +55,10 @@
         "Xrender",
         "Xtst"
     ],
-    "editor.insertSpaces": false
+    "editor.insertSpaces": false,
+    "cmake.configureOnOpen": false,
+    "clangd.serverCompletionRanking": true,
+    "clangd.fallbackFlags": [
+        "--std=c++23"
+    ]
 }
