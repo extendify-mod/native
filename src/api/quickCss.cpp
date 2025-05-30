@@ -1,15 +1,17 @@
 #include "quickCss.hpp"
 
-#include "api/api.hpp"
+#include "util/CBHandler.hpp"
+#include "util/APIFunction.hpp"
+#include "util/APIUsage.hpp"
 #include "fs/fs.hpp"
 #include "fs/Watcher.hpp"
 #include "log/Logger.hpp"
 #include "path/path.hpp"
+#include "util/V8Type.hpp"
 #include "util/TaskCBHandler.hpp"
 
 #include <cef_base.h>
 #include <cef_v8.h>
-#include <exception>
 #include <memory>
 
 using namespace Extendify;
@@ -20,6 +22,11 @@ static CefRefPtr<CefV8Context> quickCssContext = nullptr;
 
 namespace Extendify::api::quickCss {
 	log::Logger logger({"Extendify", "api", "quickCss"});
+	using util::APIFunction;
+	using util::APIUsage;
+	using util::V8Type;
+	using util::CBHandler;
+	using Extendify::util::TaskCBHandler;
 
 	namespace usage {
 		APIUsage get {APIFunction {
@@ -177,7 +184,7 @@ namespace Extendify::api::quickCss {
 
 	void dispatchQuickCssUpdate(const std::string& contents) {
 		CefTaskRunner::GetForThread(CefThreadId::TID_RENDERER)
-			->PostTask(util::TaskCBHandler::Create([contents]() {
+			->PostTask(TaskCBHandler::Create([contents]() {
 				if (!quickCssContext) {
 					logger.warn(
 						"attempting to dispatch a quick css update before any listeners are setup");
@@ -188,7 +195,7 @@ namespace Extendify::api::quickCss {
 					return;
 				}
 				quickCssContext->GetTaskRunner()->PostTask(
-					util::TaskCBHandler::Create([contents]() -> void {
+					TaskCBHandler::Create([contents]() -> void {
 						for (const auto& cb : quickCssChangeListeners) {
 							if (!cb->IsFunction()) {
 								logger.warn(

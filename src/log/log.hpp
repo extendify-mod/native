@@ -5,15 +5,16 @@
 #include <cstdlib>
 #include <iostream>
 
-[[gnu::always_inline]] [[noreturn]] inline bool e_abort(const char* msg, const char* file, int line,
-														const char* func) {
-	std::cerr << file << ":" << line << ": " << func << ": Assertion `" << msg << "` failed."
-			  << std::endl;
+[[gnu::always_inline]] [[noreturn]] inline bool
+e_abort(const char* msg, const char* file, int line, const char* func) {
+	std::println(
+		std::cerr, "{}:{}:{}: Assertion `{}` failed.", file, line, func, msg);
 	std::abort();
 }
 
 #ifdef _WIN32
-#define E_ASSERT(x) (void)(!!(x) || (e_abort(#x, __FILE__, __LINE__, __func__)))
+#define E_ASSERT(x)                                                         \
+	(void)(!!(x) || (e_abort(#x, __PRETTY_FUNCTION__, __LINE__, __func__)))
 #elif defined(__linux__)
 #ifdef NDEBUG
 // assert copied from assert.h
@@ -39,13 +40,15 @@
 #endif
 #endif
 /* This prints an "Assertion failed" message and aborts.  */
-extern void __assert_fail(const char* __assertion, const char* __file, unsigned int __line,
-						  const char* __function) __THROW __attribute__((__noreturn__));
+extern void __assert_fail(const char* __assertion, const char* __file,
+						  unsigned int __line, const char* __function) __THROW
+	__attribute__((__noreturn__));
 #endif
-#define E_ASSERT(expr)                                                            \
-	(static_cast<bool>(expr)                                                      \
-		 ? void(0)                                                                \
-		 : __assert_fail(#expr, __ASSERT_FILE, __ASSERT_LINE, __ASSERT_FUNCTION))
+#define E_ASSERT(expr)                                                  \
+	(static_cast<bool>(expr)                                            \
+		 ? void(0)                                                      \
+		 : __assert_fail(                                               \
+			   #expr, __ASSERT_FILE, __ASSERT_LINE, __ASSERT_FUNCTION))
 #endif
 
 namespace Extendify {

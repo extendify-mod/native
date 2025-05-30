@@ -6,11 +6,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
-if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND WIN32)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND WIN32)
 
-    message(FATAL_ERROR "GCC is not supported on Windows. Please use Clang.")
+  message(FATAL_ERROR "GCC is not supported on Windows. Please use Clang.")
 
-endif ()
+endif()
 
 # Set the source directory
 set(SRC_DIR "${CMAKE_SOURCE_DIR}/src")
@@ -21,11 +21,11 @@ file(GLOB_RECURSE SOURCES "${SRC_DIR}/*.cpp" "${SRC_DIR}/*.c")
 find_package(spdlog REQUIRED)
 find_package(libcef REQUIRED)
 find_package(cef_dll_wrapper REQUIRED)
-if (WIN32)
-    find_package(detours REQUIRED)
-elseif (LINUX)
-    find_package(dobby)
-endif ()
+if(WIN32)
+  find_package(detours REQUIRED)
+elseif(LINUX)
+  find_package(dobby)
+endif()
 # Create a shared library
 add_library(extendify SHARED ${SOURCES})
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/deps/wrapper)
@@ -34,52 +34,70 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/deps/wrapper)
 target_link_libraries(extendify PRIVATE spdlog)
 target_link_libraries(extendify PRIVATE libcef_dll_wrapper)
 target_link_libraries(extendify PRIVATE libcef)
-if (WIN32)
-    target_link_libraries(extendify PRIVATE detours)
-elseif (LINUX)
-    target_link_libraries(extendify PUBLIC dobby_static)
-endif ()
+if(WIN32)
+  target_link_libraries(extendify PRIVATE detours)
+  # win32 apis
+  target_link_libraries(extendify PRIVATE shlwapi)
+  target_link_libraries(extendify PRIVATE propsys)
+elseif(LINUX)
+  target_link_libraries(extendify PUBLIC dobby_static)
+endif()
 
 # Specify the include directories if needed
 target_include_directories(extendify PRIVATE "${SRC_DIR}")
 set_property(TARGET extendify PROPERTY CXX_STANDARD 23)
 include(cmake/compilerChecks.cmake)
-if (CMAKE_BUILD_TYPE STREQUAL "Release")
-elseif (SUPPORTS_GDWARF)
-    target_compile_options(extendify PUBLIC -gdwarf)
-else ()
-    message(WARNING "-gdwarf is not supported, no debug symbols will be output")
-endif ()
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+
+elseif(SUPPORTS_GDWARF)
+  target_compile_options(extendify PUBLIC -gdwarf)
+else()
+  message(WARNING "-gdwarf is not supported, no debug symbols will be output")
+endif()
 if(C_GETENV_DEPRECATED)
-    message(STATUS "getenv is deprecated, suppressing")
-    target_compile_definitions(extendify PRIVATE _CRT_SECURE_NO_WARNINGS)
+  message(STATUS "getenv is deprecated, suppressing")
+  target_compile_definitions(extendify PRIVATE _CRT_SECURE_NO_WARNINGS)
 endif()
 if(WIN32_STD_MINMAX_NEEDS_NOMINMAX)
-    message(STATUS "std::min and std::max need NOMINMAX")
-    target_compile_definitions(extendify PRIVATE NOMINMAX)
+  message(STATUS "std::min and std::max need NOMINMAX")
+  target_compile_definitions(extendify PRIVATE NOMINMAX)
 endif()
 
 if(WIN32)
-add_custom_target(extendify.copyDeps DEPENDS setdll extendify_wrapper)
-add_custom_command(TARGET extendify.copyDeps
-        PRE_BUILD
-        COMMAND
-        ${CMAKE_COMMAND} -E copy $<TARGET_FILE:setdll> ${CMAKE_CURRENT_BINARY_DIR}/setdll.exe
-)
+  add_custom_target(extendify.copyDeps DEPENDS setdll extendify_wrapper)
+  add_custom_command(
+    TARGET extendify.copyDeps
+    PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:setdll>
+            ${CMAKE_CURRENT_BINARY_DIR}/setdll.exe)
 else()
-add_custom_target(extendify.copyDeps DEPENDS extendify_wrapper)
+  add_custom_target(extendify.copyDeps DEPENDS extendify_wrapper)
 endif()
 add_dependencies(extendify extendify.copyDeps)
-if (WIN32)
-add_custom_command(TARGET extendify.copyDeps
-        PRE_BUILD
-        COMMAND
-        ${CMAKE_COMMAND} -E copy $<TARGET_FILE:extendify_wrapper> ${CMAKE_CURRENT_BINARY_DIR}/extendify_wrapper.dll
-)
+if(WIN32)
+  add_custom_command(
+    TARGET extendify.copyDeps
+    PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:extendify_wrapper>
+            ${CMAKE_CURRENT_BINARY_DIR}/extendify_wrapper.dll)
 else()
-add_custom_command(TARGET extendify.copyDeps
-        PRE_BUILD
-        COMMAND
-        ${CMAKE_COMMAND} -E copy $<TARGET_FILE:extendify_wrapper> ${CMAKE_CURRENT_BINARY_DIR}/extendify_wrapper.so
-)
+  add_custom_command(
+    TARGET extendify.copyDeps
+    PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:extendify_wrapper>
+            ${CMAKE_CURRENT_BINARY_DIR}/extendify_wrapper.so)
+endif()
+# try to make compile commands better
+find_program(compdb compdb)
+if(compdb STREQUAL "compdb-NOTFOUND")
+  message(
+    WARNING "compdb not found, compile commands will not be limited for clangd")
+else()
+  message(STATUS "compdb found, generating target compdb")
+  add_custom_target(
+    compdb ALL
+    COMMAND "${compdb}" "-p" "${CMAKE_BINARY_DIR}" "list" ">"
+            "${CMAKE_BINARY_DIR}/c2" "2>" "/dev/null"
+    COMMAND "${CMAKE_COMMAND}" -E rename "${CMAKE_BINARY_DIR}/c2"
+            "${CMAKE_BINARY_DIR}/compile_commands.json")
 endif()

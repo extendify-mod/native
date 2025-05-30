@@ -1,14 +1,12 @@
 #include "json.hpp"
 
-#include "util.hpp"
+#include "api/api.hpp"
 
 #include <cef_v8.h>
 #include <format>
 #include <stdexcept>
 
-using namespace Extendify::util;
-
-namespace Extendify::util::json {
+namespace Extendify::api::util::json {
 	static CefRefPtr<CefV8Value> getJsonMethod(const std::string& method) {
 		CefRefPtr<CefV8Context> context = CefV8Context::GetCurrentContext();
 		CefRefPtr<CefV8Value> window = context->GetGlobal();
@@ -20,12 +18,14 @@ namespace Extendify::util::json {
 		auto JSON = window->GetValue("JSON");
 		if (!JSON->HasValue(method)) {
 			logger.error("window.JSON.{} does not exist", method);
-			throw std::runtime_error(std::format("window.JSON.{} does not exist", method));
+			throw std::runtime_error(
+				std::format("window.JSON.{} does not exist", method));
 		}
 		CefRefPtr<CefV8Value> toRet = JSON->GetValue(method);
 		if (!toRet->IsFunction()) {
 			logger.error("window.JSON.{} is not a function", method);
-			throw std::runtime_error(std::format("window.JSON.{} is not a function", method));
+			throw std::runtime_error(
+				std::format("window.JSON.{} is not a function", method));
 		}
 		return toRet;
 	}
@@ -39,24 +39,24 @@ namespace Extendify::util::json {
 		auto jsonParse = getJsonMethod("parse");
 		auto ret = jsonParse->ExecuteFunction(nullptr, {json});
 
-        if(jsonParse->HasException()) {
-            const auto msg = jsonParse->GetException()->GetMessage();
-            logger.error("JSON.parse exception: {}", msg.ToString());
-            throw std::runtime_error(msg);
-        }
+		if (jsonParse->HasException()) {
+			const auto msg = jsonParse->GetException()->GetMessage();
+			logger.error("JSON.parse exception: {}", msg.ToString());
+			throw std::runtime_error(msg);
+		}
 
-        return ret;
+		return ret;
 	};
 
 	std::string stringify(const CefRefPtr<CefV8Value>& obj) {
-        auto stringify = getJsonMethod("stringify");
-        auto ret = stringify->ExecuteFunction(nullptr, {obj});
-        
-        if(stringify->HasException()) {
-            const auto msg = stringify->GetException()->GetMessage();
-            logger.error("JSON.stringify exception: {}", msg.ToString());
-            throw std::runtime_error(msg);
-        }
-        return ret->GetStringValue();
-    };
-} // namespace Extendify::util::json
+		auto stringify = getJsonMethod("stringify");
+		auto ret = stringify->ExecuteFunction(nullptr, {obj});
+
+		if (stringify->HasException()) {
+			const auto msg = stringify->GetException()->GetMessage();
+			logger.error("JSON.stringify exception: {}", msg.ToString());
+			throw std::runtime_error(msg);
+		}
+		return ret->GetStringValue();
+	};
+} // namespace Extendify::api::util::json

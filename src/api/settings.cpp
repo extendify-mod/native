@@ -1,15 +1,23 @@
 #include "settings.hpp"
 
-#include "api.hpp"
 #include "fs/fs.hpp"
 #include "log/Logger.hpp"
 #include "path/path.hpp"
+#include "util/APIFunction.hpp"
+#include "util/APIUsage.hpp"
+#include "util/CBHandler.hpp"
 #include "util/json.hpp"
 
 #include <cef_base.h>
 #include <cef_v8.h>
 
+
 namespace Extendify::api::settings {
+	using util::APIFunction;
+	using util::APIUsage;
+	using util::CBHandler;
+	using util::V8Type;
+
 	namespace usage {
 		APIUsage get {APIFunction {
 			.name = "get",
@@ -90,7 +98,8 @@ namespace Extendify::api::settings {
 
 		auto getSettingsDirFunc =
 			CefV8Value::CreateFunction("getSettingsDir", getSettingsDirHandler);
-		api->SetValue("getSettingsDir", getSettingsDirFunc, V8_PROPERTY_ATTRIBUTE_NONE);
+		api->SetValue(
+			"getSettingsDir", getSettingsDirFunc, V8_PROPERTY_ATTRIBUTE_NONE);
 
 		return api;
 	}

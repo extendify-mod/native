@@ -1,15 +1,13 @@
 #include "string.hpp"
 
-#include "fs/Watcher.hpp"
-
 #include <regex>
 #include <string>
-
 
 namespace Extendify::util::string {
 
 	[[nodiscard]] std::vector<std::string>
-	split(const std::string& str, const std::string& delimiter, const SplitOptions& opts) noexcept {
+	split(const std::string& str, const std::string& delimiter,
+		  const SplitOptions& opts) noexcept {
 		if (!opts.limit) {
 			return {};
 		}
@@ -49,9 +47,9 @@ namespace Extendify::util::string {
 		return std::move(res);
 	}
 
-	[[nodiscard]] std::vector<std::string> split(const std::string& str,
-												 const std::basic_regex<char>& delimiter,
-												 const SplitOptions& opts) {
+	[[nodiscard]] std::vector<std::string>
+	split(const std::string& str, const std::basic_regex<char>& delimiter,
+		  const SplitOptions& opts) {
 		if (!opts.limit) {
 			return {};
 		}
