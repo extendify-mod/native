@@ -43,4 +43,6 @@ namespace Extendify::util::string {
 
 	void replace(std::string& str, const std::basic_regex<char>& regex,
 				 const std::string& replacement);
+	[[nodiscard]] std::string wstringToString(std::wstring wstr);
+	[[nodiscard]] std::wstring stringToWstring(std::string str);
 } // namespace Extendify::util::string

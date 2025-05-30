@@ -1,18 +1,12 @@
+#include "main.hpp"
+
 #include "api/entrypoint.hpp"
-#include "log/log.hpp"
 
 #include <cef_version_info.h>
-#include <cstdio>
-#include <iostream>
 
 #ifdef _WIN32
 #include <windows.h>
-
-#include <consoleapi.h>
-
 #endif
-
-using namespace Extendify;
 
 enum Status {
 	NOT_STARTED,
@@ -20,32 +14,36 @@ enum Status {
 	ERR
 };
 
-Status runStart() {
-	logger.trace("runStart started");
+namespace Extendify {
+	log::Logger logger({"Extendify"});
 
-	try {
-		api::entrypoint::init();
-	} catch (const std::exception& e) {
-		logger.error("Failed to runStart: {}", e.what());
-		return ERR;
+	Status runStart() {
+		logger.trace("runStart started");
+
+		try {
+			api::entrypoint::init();
+		} catch (const std::exception& e) {
+			logger.error("Failed to runStart: {}", e.what());
+			return ERR;
+		}
+		logger.trace("runStart finished");
+		return OK;
 	}
-	logger.trace("runStart finished");
-	return OK;
-}
 
-Status runStop() {
-	return OK;
-}
+	Status runStop() {
+		return OK;
+	}
+} // namespace Extendify
 
 #if defined(_WIN32)
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 	Status ret = Status::NOT_STARTED;
 	switch (fdwReason) {
 		case DLL_PROCESS_ATTACH:
-			ret = runStart();
+			ret = Extendify::runStart();
 			break;
 		case DLL_THREAD_DETACH:
-			ret = runStop();
+			ret = Extendify::runStop();
 		case DLL_THREAD_ATTACH:
 		case DLL_PROCESS_DETACH:
 		default:

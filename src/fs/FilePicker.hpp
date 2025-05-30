@@ -1,5 +1,6 @@
 #pragma once
 
+#include "main.hpp"
 #include <cef_base.h>
 #include <cef_thread.h>
 #include <cef_v8.h>
@@ -26,17 +27,45 @@ namespace Extendify::fs {
 		// somethoing went wrong or the user cancelled the dialog
 		// If an error occurs, the third argument will contain an error message
 		typedef std::function<std::expected<CefRefPtr<CefV8Value>, std::string>(
-			CefRefPtr<FilePicker>, std::vector<std::filesystem::path>, std::optional<std::string>)>
+			CefRefPtr<FilePicker>, std::vector<std::filesystem::path>,
+			std::optional<std::string>)>
 			PromiseCallback;
 		typedef std::function<void(CefRefPtr<FilePicker>,
-								   std::vector<std::filesystem::path>, std::optional<std::string>)>
+								   std::vector<std::filesystem::path>,
+								   std::optional<std::string>)>
 			Callback;
 
+		struct FileFilter {
+			std::string displayName;
+			/**
+			 * @brief array of file patterns
+			 *
+			 * @example {"*.css", "*.theme.css"}
+			 * @invariant each patter must not contain a semicolon `;`
+			 */
+			std::vector<std::string> patterns;
+		};
+
 		struct FilePickerData {
-			DialogType mode = DialogType::OPEN;
-			std::string title;
-			std::filesystem::path defaultFilePath;
-			std::vector<std::string> acceptFilters;
+			const DialogType mode = DialogType::OPEN;
+			const std::string title;
+
+			/**
+			 * @brief folder path to open the dialog in
+			 * 
+			 * @invariant must exist
+			 * @invariant must be a directory
+			 */
+			const std::filesystem::path defaultFolderPath;
+			const std::vector<FileFilter> filters;
+			/**
+			 * @brief the default file filter
+			 *
+			 * SHOULD NOT BE IN @link filters
+			 */
+			const FileFilter defaultFilter = {.displayName = "All Files",
+											  .patterns = {"*.*"}};
+			const ids::ExtendifyId& stateId = ids::DEFAULT;
 		};
 
 		FilePicker() = delete;
@@ -64,31 +93,42 @@ namespace Extendify::fs {
 		[[nodiscard]] static CefRefPtr<FilePicker> pickFolder();
 		[[nodiscard]] static CefRefPtr<FilePicker> pickSaveFile();
 
+		// thread-safe
+		[[nodiscard]] constexpr bool isRunning() const {
+			return running;
+		}
+
 	  private:
+		// we can't run more than one per instance, at a time
+		std::atomic_bool running = false;
 		// ctor
 		[[nodiscard]] explicit FilePicker(FilePickerData data);
 		// static
 		static int nextId;
 		// config
-		DialogType mode;
+		const FilePickerData data;
 		// impl
-		int id = nextId++;
+		const int id = nextId++;
+
 		struct V8Data {
 			CefRefPtr<CefV8Context> context;
 			CefRefPtr<CefV8Value> promise;
 			PromiseCallback callback;
 		};
+
 		struct RawData {
 			Callback callback;
 		};
-		std::variant<V8Data, RawData> data;
+
+		std::variant<V8Data, RawData> callbackData;
 		CefRefPtr<CefThread> pickerThread;
 
 		CefRefPtr<FilePicker> self;
 
 		void runFilePicker();
-		std::expected<std::vector<std::filesystem::path>, std::string>
-		showDialog();
+		[[nodiscard]] std::expected<std::vector<std::filesystem::path>,
+									std::string>
+		showDialog() const;
 		IMPLEMENT_REFCOUNTING(FilePicker);
 	};
 } // namespace Extendify::fs

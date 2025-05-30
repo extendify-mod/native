@@ -3,13 +3,15 @@
 #include "api/util/ScopedV8Context.hpp"
 #include "log/log.hpp"
 #include "log/Logger.hpp"
-#include "util/iter.hpp"
+#include "main.hpp"
+#include "util/string.hpp"
 #include "util/TaskCBHandler.hpp"
 
 #include <cef_task.h>
 #include <concepts>
 #include <internal/cef_types.h>
 #include <memory>
+#include <winnt.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -301,13 +303,58 @@ namespace Extendify::fs {
 			virtual HRESULT getOptions(DWORD* pFlags) = 0;
 			virtual HRESULT setOptions(DWORD flags) = 0;
 			/// {{name, extension(s)}}
-			virtual HRESULT setFileTypes(
-				const std::vector<std::pair<std::wstring, std::wstring>>&
-					tileTypes) = 0;
-			virtual HRESULT setFileTypeIndex(unsigned int index) = 0;
+			virtual HRESULT
+			setFileTypes(const FilePicker::FilePickerData& data) = 0;
 			virtual HRESULT setDefaultExtension(const std::wstring& ext) = 0;
+			virtual HRESULT setTitle(std::string title) = 0;
+			virtual HRESULT setStateId(const ids::ExtendifyId& id) = 0;
+			virtual HRESULT
+			setDefaultFolder(const std::filesystem::path& path) = 0;
 			virtual HRESULT show() = 0;
 			virtual ~Iw_FileDialog() = default;
+
+		  protected:
+			std::vector<std::wstring> dialogStrings;
+			std::wstring title;
+			w_ptr_t<IShellItem> defaultFolder;
+
+			HRESULT _setDefaultFolderItem(const std::filesystem::path& path) {
+				IShellItem* tmp = nullptr;
+				auto ret = SHCreateItemFromParsingName(
+					path.c_str(), nullptr, IID_PPV_ARGS(&tmp));
+				defaultFolder.reset(tmp);
+				return ret;
+			}
+
+			COMDLG_FILTERSPEC
+			transformFilter(const FilePicker::FileFilter& filter) {
+				constexpr const static auto defaultExt = L"*.*";
+				constexpr const static auto defaultDisplayName =
+					L"Unknown filter";
+				COMDLG_FILTERSPEC spec;
+				if (filter.displayName.empty()) {
+					logger.warn("FileFilter has no display name, using "
+								"'Unknown filter'");
+					spec.pszName = defaultDisplayName;
+				} else {
+					auto str =
+						util::string::stringToWstring(filter.displayName);
+					dialogStrings.emplace_back(std::move(str));
+					spec.pszName = dialogStrings.back().c_str();
+				}
+				if (filter.patterns.empty()) {
+					logger.warn(
+						"FileFilter has no patterns, using default *.*");
+					spec.pszSpec = defaultExt;
+				} else {
+					auto str = util::string::stringToWstring(
+						util::string::join(filter.patterns, ";"));
+					dialogStrings.emplace_back(std::move(str));
+					spec.pszSpec = dialogStrings.back().c_str();
+				}
+
+				return spec;
+			}
 		};
 
 		class w_ShellItem: public w_ptr_t<IShellItem>, public Iw_ShellItem {
@@ -450,27 +497,68 @@ namespace Extendify::fs {
 				return this->get()->SetOptions(flags);
 			}
 
-			HRESULT setFileTypes(
-				const std::vector<std::pair<std::wstring, std::wstring>>&
-					fileTypes) override {
-				filters = util::iter::map(fileTypes, [](const auto& pair) {
-					return COMDLG_FILTERSPEC {
-						.pszName = pair.first.c_str(),
-						.pszSpec = pair.second.c_str(),
-					};
-				});
-				E_ASSERT(get() && "FileDialog is not initialized");
-				return get()->SetFileTypes(filters.size(), filters.data());
-			}
+			HRESULT
+			setFileTypes(const FilePicker::FilePickerData& fileTypes) override {
+				// doesnt change the capacity
+				dialogStrings.clear();
+				// each filter has a name and a patter, + 2 for default filter
+				dialogStrings.reserve(fileTypes.filters.size() * 2 + 2);
 
-			HRESULT setFileTypeIndex(unsigned int index) override {
+				filters.clear();
+				filters.reserve(fileTypes.filters.size() + 1);
+
+				filters.push_back(transformFilter(fileTypes.defaultFilter));
+				for (const auto& filter : fileTypes.filters) {
+					filters.push_back(transformFilter(filter));
+				}
+
 				E_ASSERT(get() && "FileDialog is not initialized");
-				return get()->SetFileTypeIndex(index);
+				const auto hr =
+					get()->SetFileTypes(filters.size(), filters.data());
+				if (FAILED(hr)) {
+					return hr;
+				}
+				// we pass a 0-based array, but set the index as 1-based
+				// more:
+				// https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifiledialog-setfiletypeindex#parameters
+				return get()->SetFileTypeIndex(1);
 			}
 
 			HRESULT setDefaultExtension(const std::wstring& ext) override {
 				E_ASSERT(get() && "FileDialog is not initialized");
 				return get()->SetDefaultExtension(ext.c_str());
+			}
+
+			HRESULT setTitle(std::string _title) override {
+				E_ASSERT(get() && "FileDialog is not initialized");
+				if (_title.empty()) {
+					title = L"Open File(s)";
+				} else {
+					title = std::move(
+						util::string::stringToWstring(std::move(_title)));
+				}
+				return get()->SetTitle(title.c_str());
+			}
+
+			HRESULT setStateId(const ids::ExtendifyId& id) override {
+				E_ASSERT(get() && "FileDialog is not initialized");
+				E_ASSERT(id && "id is null");
+				return get()->SetClientGuid(ids::extendifyIdToGUID(id));
+			}
+
+			HRESULT
+			setDefaultFolder(const std::filesystem::path& path) override {
+				E_ASSERT(get() && "FileDialog is not initialized");
+				if (path.empty()) {
+					logger.warn("Default folder path is empty, skipping");
+					return S_OK;
+				}
+
+				auto hr = _setDefaultFolderItem(path);
+				if (FAILED(hr)) {
+					return hr;
+				}
+				return get()->SetDefaultFolder(defaultFolder.get());
 			}
 
 			HRESULT show() override {
@@ -551,27 +639,68 @@ namespace Extendify::fs {
 				return this->get()->SetOptions(flags);
 			}
 
-			HRESULT setFileTypes(
-				const std::vector<std::pair<std::wstring, std::wstring>>&
-					fileTypes) override {
-				filters = util::iter::map(fileTypes, [](const auto& pair) {
-					return COMDLG_FILTERSPEC {
-						.pszName = pair.first.c_str(),
-						.pszSpec = pair.second.c_str(),
-					};
-				});
-				E_ASSERT(get() && "FileDialog is not initialized");
-				return get()->SetFileTypes(filters.size(), filters.data());
-			}
+			HRESULT
+			setFileTypes(const FilePicker::FilePickerData& fileTypes) override {
+				// doesnt change the capacity
+				dialogStrings.clear();
+				// each filter has a name and a patter, + 2 for default filter
+				dialogStrings.reserve(fileTypes.filters.size() * 2 + 2);
 
-			HRESULT setFileTypeIndex(unsigned int index) override {
+				filters.clear();
+				filters.reserve(fileTypes.filters.size() + 1);
+
+				filters.push_back(transformFilter(fileTypes.defaultFilter));
+				for (const auto& filter : fileTypes.filters) {
+					filters.push_back(transformFilter(filter));
+				}
+
 				E_ASSERT(get() && "FileDialog is not initialized");
-				return get()->SetFileTypeIndex(index);
+				const auto hr =
+					get()->SetFileTypes(filters.size(), filters.data());
+				if (FAILED(hr)) {
+					return hr;
+				}
+				// we pass a 0-based array, but set the index as 1-based
+				// more:
+				// https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifiledialog-setfiletypeindex#parameters
+				return get()->SetFileTypeIndex(1);
 			}
 
 			HRESULT setDefaultExtension(const std::wstring& ext) override {
 				E_ASSERT(get() && "FileDialog is not initialized");
 				return get()->SetDefaultExtension(ext.c_str());
+			}
+
+			HRESULT setTitle(std::string _title) override {
+				E_ASSERT(get() && "FileDialog is not initialized");
+				if (_title.empty()) {
+					title = L"Save File";
+				} else {
+					title = std::move(
+						util::string::stringToWstring(std::move(_title)));
+				}
+				return get()->SetTitle(title.c_str());
+			}
+
+			HRESULT setStateId(const ids::ExtendifyId& id) override {
+				E_ASSERT(get() && "FileDialog is not initialized");
+				E_ASSERT(id && "id is null");
+				return get()->SetClientGuid(ids::extendifyIdToGUID(id));
+			}
+
+			HRESULT
+			setDefaultFolder(const std::filesystem::path& path) override {
+				E_ASSERT(get() && "FileDialog is not initialized");
+				if (path.empty()) {
+					logger.warn("Default folder path is empty, skipping");
+					return S_OK;
+				}
+
+				auto hr = _setDefaultFolderItem(path);
+				if (FAILED(hr)) {
+					return hr;
+				}
+				return get()->SetDefaultFolder(defaultFolder.get());
 			}
 
 			HRESULT show() override {
@@ -590,7 +719,7 @@ namespace Extendify::fs {
 	int FilePicker::nextId = 1;
 
 	FilePicker::FilePicker(FilePickerData data):
-		mode(data.mode) {
+		data(std::move(data)) {
 	}
 
 	[[nodiscard]] CefRefPtr<FilePicker>
@@ -604,11 +733,17 @@ namespace Extendify::fs {
 	[[nodiscard]] CefRefPtr<CefV8Value>
 	FilePicker::promise(CefRefPtr<CefV8Context> _context,
 						PromiseCallback _callback) {
-		// this->context = std::move(_context);
-		// this->callback = std::move(_callback);
+		if (isRunning()) {
+			constexpr auto msg =
+				"Trying to launch a file picker while another is "
+				"already running for the same object";
+			logger.error(msg);
+			throw std::runtime_error(msg);
+		}
+		running = true;
 		api::util::ScopedV8Context ctx(_context);
 		auto promise = CefV8Value::CreatePromise();
-		data = V8Data {
+		callbackData = V8Data {
 			.context = _context,
 			.promise = promise,
 			.callback = std::move(_callback),
@@ -618,7 +753,15 @@ namespace Extendify::fs {
 	}
 
 	void FilePicker::launch(Callback callback) {
-		data = RawData {std::move(callback)};
+		if (isRunning()) {
+			constexpr auto msg =
+				"Trying to launch a file picker while another is "
+				"already running for the same object";
+			logger.error(msg);
+			throw std::runtime_error(msg);
+		}
+		running = true;
+		callbackData = RawData {std::move(callback)};
 		runFilePicker();
 	}
 
@@ -635,23 +778,40 @@ namespace Extendify::fs {
 				} else {
 					err = std::move(res.error());
 				}
-				if (std::holds_alternative<V8Data>(data)) {
+				if (std::holds_alternative<V8Data>(callbackData)) {
 					CefTaskRunner::GetForThread(TID_RENDERER)
 						->PostTask(util::TaskCBHandler::Create(
 							[this,
 							 paths = std::move(paths),
 							 err = std::move(err)]() {
-								auto& v8Data = std::get<V8Data>(data);
+								auto& v8Data = std::get<V8Data>(callbackData);
 								E_ASSERT(v8Data.context->IsValid()
 										 && "V8Context is not valid");
 								v8Data.context->GetTaskRunner()->PostTask(
-									util::TaskCBHandler::Create(
-										[=, &v8Data, this]() {
-											v8Data.context->Enter();
-											// keep a ref so dont drop it if the callback drops it
-											auto _ = self;
-											auto ret = v8Data.callback(
+									util::TaskCBHandler::Create([=,
+																 &v8Data,
+																 this]() {
+										api::util::ScopedV8Context ctx(
+											v8Data.context);
+										// keep a ref so dont drop it if the
+										// callback drops it
+										auto _ = self;
+										std::expected<CefRefPtr<CefV8Value>,
+													  std::string>
+											ret;
+										try {
+											ret = v8Data.callback(
 												std::move(self), paths, err);
+										} catch (std::exception& e) {
+											const auto msg = std::format(
+												"Error in FilePicker promise "
+												"callback: {}",
+												e.what());
+											logger.error(msg);
+											ret = std::unexpected(
+												std::string(e.what()));
+										}
+										try {
 											if (ret.has_value()) {
 												v8Data.promise->ResolvePromise(
 													std::move(ret.value()));
@@ -659,18 +819,34 @@ namespace Extendify::fs {
 												v8Data.promise->RejectPromise(
 													ret.error());
 											}
-										}));
+										} catch (const std::exception& e) {
+											logger.error(
+												"ERROR: at {}:{}, what: {}",
+												__FILE__,
+												__LINE__,
+												e.what());
+										}
+										running = false;
+									}));
 							}));
 				} else {
-					auto& rawData = std::get<RawData>(this->data);
-					rawData.callback(
-						std::move(self), std::move(paths), std::move(err));
+					auto& rawData = std::get<RawData>(this->callbackData);
+					// keep a ref so dont drop it if the callback
+					auto _ = self;
+					try {
+						rawData.callback(
+							std::move(self), std::move(paths), std::move(err));
+					} catch (const std::exception& e) {
+						logger.error("Error in FilePicker callback: {}",
+									 e.what());
+					}
+					running = false;
 				}
 			}));
 	}
 
-	std::expected<std::vector<std::filesystem::path>, std::string>
-	FilePicker::showDialog() {
+	[[nodiscard]] std::expected<std::vector<std::filesystem::path>, std::string>
+	FilePicker::showDialog() const {
 #ifdef _WIN32
 #ifdef E_CHECK_ERR
 #warning "E_CHECK_ERR is already defined, redefining it"
@@ -684,7 +860,7 @@ namespace Extendify::fs {
 		logger.error(msg);                                             \
 		return std::unexpected(msg);                                   \
 	}
-		auto isSave = mode == DialogType::SAVE;
+		auto isSave = data.mode == DialogType::SAVE;
 		// CoCreate the File Open Dialog object.
 		std::unique_ptr<Iw_FileDialog> fileDialog;
 		if (isSave) {
@@ -711,7 +887,7 @@ namespace Extendify::fs {
 		{
 			DWORD flags = dwFlags | FOS_FORCEFILESYSTEM;
 			flags |= FOS_OKBUTTONNEEDSINTERACTION;
-			switch (mode) {
+			switch (data.mode) {
 				case DialogType::OPEN: {
 					break;
 				}
@@ -733,22 +909,21 @@ namespace Extendify::fs {
 			hr = fileDialog->setOptions(flags);
 		}
 		E_CHECK_ERR(hr);
-		// Set the file types to display only.
-		// Notice that this is a 1-based array.
-		const static std::vector<std::pair<std::wstring, std::wstring>>
-			fileTypes {
-				{L"Style Sheets", L"*.css;*.theme.css"},
-				{L"All Files", L"*.*"},
-			};
-		hr = fileDialog->setFileTypes(fileTypes);
+		// set the default file type and file types
+		hr = fileDialog->setFileTypes(data);
 		E_CHECK_ERR(hr);
-		// Set the selected file type index to Style Sheets for this example.
-		hr =
-			fileDialog->setFileTypeIndex(1); // 1 is the index of "Style Sheets"
+		// set the title
+		hr = fileDialog->setTitle(data.title);
 		E_CHECK_ERR(hr);
-		// Set the default extension to be ".css" file.
-		hr = fileDialog->setDefaultExtension(L"css");
+		// set the state id
+		hr = fileDialog->setStateId(data.stateId);
 		E_CHECK_ERR(hr);
+		// set the default folder
+		hr = fileDialog->setDefaultFolder(data.defaultFolderPath);
+		E_CHECK_ERR(hr);
+		// // Set the default extension to be ".css" file.
+		// hr = fileDialog->setDefaultExtension(L"css");
+		// E_CHECK_ERR(hr);
 		// Show the dialog
 		hr = fileDialog->show();
 		E_CHECK_ERR(hr);

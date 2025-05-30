@@ -84,7 +84,19 @@ namespace Extendify::api::themes {
 		   CefString& exception) {
 			try {
 				usage::uploadTheme.validateOrThrow(arguments);
-				auto picker = fs::FilePicker::pickOne();
+				auto picker = fs::FilePicker::Create({
+					.mode = fs::FilePicker::DialogType::OPEN,
+					.title = "Select a theme file to upload",
+					.filters = {{
+						.displayName = "All Files",
+						.patterns = {"*.*"},
+					}},
+					.defaultFilter =
+						{
+							.displayName = "CSS Files",
+							.patterns = {"*.css", "*.theme.css"},
+						},
+				});
 				retval = picker->promise(
 					CefV8Context::GetCurrentContext(),
 					[](CefRefPtr<fs::FilePicker> picker,

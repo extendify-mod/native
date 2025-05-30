@@ -1,5 +1,4 @@
 #pragma once
-#include "Logger.hpp"
 
 #include <cassert>
 #include <cstdlib>
@@ -50,7 +49,3 @@ extern void __assert_fail(const char* __assertion, const char* __file,
 		 : __assert_fail(                                               \
 			   #expr, __ASSERT_FILE, __ASSERT_LINE, __ASSERT_FUNCTION))
 #endif
-
-namespace Extendify {
-	extern log::Logger logger;
-}; // namespace Extendify
