@@ -9,8 +9,8 @@
 #include "util/V8Type.hpp"
 
 #include <cef_v8.h>
+#include <internal/cef_ptr.h>
 #include <regex>
-
 
 static CefV8ValueList themeChangeListeners {};
 static CefRefPtr<CefV8Context> themeChangeContext = nullptr;
@@ -85,12 +85,17 @@ namespace Extendify::api::themes {
 			try {
 				usage::uploadTheme.validateOrThrow(arguments);
 				auto picker = fs::FilePicker::pickOne();
-#warning DEBUG HACK, CAUSES MEMORY LEAK
-				picker->AddRef();
-				retval = picker->launch(
+				retval = picker->promise(
 					CefV8Context::GetCurrentContext(),
-					[](std::vector<std::filesystem::path> pickedPath)
+					[](CefRefPtr<fs::FilePicker> picker,
+					   std::vector<std::filesystem::path>
+						   pickedPath,
+					   std::optional<std::string>
+						   error)
 						-> std::expected<CefRefPtr<CefV8Value>, std::string> {
+						if (error.has_value()) {
+							return std::unexpected(std::move(*error));
+						}
 						if (pickedPath.empty()) {
 							constexpr auto msg =
 								"No file was picked for upload";
