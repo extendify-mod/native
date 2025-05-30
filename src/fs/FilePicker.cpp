@@ -6,11 +6,14 @@
 #include "util/iter.hpp"
 #include "util/TaskCBHandler.hpp"
 
+#include <cef_task.h>
 #include <combaseapi.h>
 #include <concepts>
+#include <internal/cef_types.h>
 #include <memory>
 #include <shobjidl_core.h>
 #include <unknwnbase.h>
+#include <variant>
 #include <winnt.h>
 
 #ifdef _WIN32
@@ -597,19 +600,31 @@ namespace Extendify::fs {
 
 	[[nodiscard]] CefRefPtr<FilePicker>
 	FilePicker::Create(FilePickerData data) {
-		return new FilePicker(std::move(data));
+		CefRefPtr<FilePicker> ret = new FilePicker(std::move(data));
+		ret->self = ret;
+		return ret;
 	}
 
 	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	[[nodiscard]] CefRefPtr<CefV8Value>
-	FilePicker::launch(CefRefPtr<CefV8Context> _context, Callback _callback) {
-		this->context = std::move(_context);
-		this->callback = std::move(_callback);
-		api::util::ScopedV8Context ctx(context);
+	FilePicker::promise(CefRefPtr<CefV8Context> _context,
+						PromiseCallback _callback) {
+		// this->context = std::move(_context);
+		// this->callback = std::move(_callback);
+		api::util::ScopedV8Context ctx(_context);
 		auto promise = CefV8Value::CreatePromise();
-		this->promise = promise;
+		data = V8Data {
+			.context = _context,
+			.promise = promise,
+			.callback = std::move(_callback),
+		};
 		runFilePicker();
 		return promise;
+	}
+
+	void FilePicker::launch(Callback callback) {
+		data = RawData {std::move(callback)};
+		runFilePicker();
 	}
 
 	void FilePicker::runFilePicker() {
@@ -618,7 +633,42 @@ namespace Extendify::fs {
 		pickerThread->GetTaskRunner()->PostTask(
 			util::TaskCBHandler::Create([this]() {
 				auto res = showDialog();
-#warning TODO
+				std::vector<std::filesystem::path> paths;
+				std::optional<std::string> err;
+				if (res.has_value()) {
+					paths = std::move(res.value());
+				} else {
+					err = std::move(res.error());
+				}
+				if (std::holds_alternative<V8Data>(data)) {
+					CefTaskRunner::GetForThread(TID_RENDERER)
+						->PostTask(util::TaskCBHandler::Create(
+							[this,
+							 paths = std::move(paths),
+							 err = std::move(err)]() {
+								auto& v8Data = std::get<V8Data>(data);
+								E_ASSERT(v8Data.context->IsValid()
+										 && "V8Context is not valid");
+								v8Data.context->GetTaskRunner()->PostTask(
+									util::TaskCBHandler::Create(
+										[=, &v8Data, this]() {
+											v8Data.context->Enter();
+											auto ret = v8Data.callback(
+												std::move(self), paths, err);
+											if (ret.has_value()) {
+												v8Data.promise->ResolvePromise(
+													std::move(ret.value()));
+											} else {
+												v8Data.promise->RejectPromise(
+													ret.error());
+											}
+										}));
+							}));
+				} else {
+					auto& rawData = std::get<RawData>(this->data);
+					rawData.callback(
+						std::move(self), std::move(paths), std::move(err));
+				}
 			}));
 	}
 

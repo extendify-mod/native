@@ -24,11 +24,12 @@ namespace Extendify::fs {
 		// the first arg is always a ref to the file picker that this was
 		// launched from, the second the result if the array is empty,
 		// somethoing went wrong or the user cancelled the dialog
+		// If an error occurs, the third argument will contain an error message
 		typedef std::function<std::expected<CefRefPtr<CefV8Value>, std::string>(
-			CefRefPtr<FilePicker>, std::vector<std::filesystem::path>)>
+			CefRefPtr<FilePicker>, std::vector<std::filesystem::path>, std::optional<std::string>)>
 			PromiseCallback;
 		typedef std::function<void(CefRefPtr<FilePicker>,
-								   std::vector<std::filesystem::path>)>
+								   std::vector<std::filesystem::path>, std::optional<std::string>)>
 			Callback;
 
 		struct FilePickerData {
@@ -82,6 +83,9 @@ namespace Extendify::fs {
 		};
 		std::variant<V8Data, RawData> data;
 		CefRefPtr<CefThread> pickerThread;
+
+		CefRefPtr<FilePicker> self;
+
 		void runFilePicker();
 		std::expected<std::vector<std::filesystem::path>, std::string>
 		showDialog();
