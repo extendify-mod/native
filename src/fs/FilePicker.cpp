@@ -7,20 +7,15 @@
 #include "util/TaskCBHandler.hpp"
 
 #include <cef_task.h>
-#include <combaseapi.h>
 #include <concepts>
 #include <internal/cef_types.h>
 #include <memory>
-#include <shobjidl_core.h>
-#include <unknwnbase.h>
-#include <variant>
-#include <winnt.h>
 
 #ifdef _WIN32
 #include <windows.h>
 #define STRICT_TYPED_ITEMIDS
 #include <shlwapi.h>
-#include <shobjidl.h> // for IFileDialogEvents and IFileDialogControlEvents
+#include <shobjidl.h>
 
 #endif
 
@@ -653,6 +648,8 @@ namespace Extendify::fs {
 									util::TaskCBHandler::Create(
 										[=, &v8Data, this]() {
 											v8Data.context->Enter();
+											// keep a ref so dont drop it if the callback drops it
+											auto _ = self;
 											auto ret = v8Data.callback(
 												std::move(self), paths, err);
 											if (ret.has_value()) {
