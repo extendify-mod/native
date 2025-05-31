@@ -11,6 +11,7 @@
 #include <concepts>
 #include <internal/cef_types.h>
 #include <memory>
+#include <shobjidl_core.h>
 #include <winnt.h>
 
 #ifdef _WIN32
@@ -266,14 +267,14 @@ namespace Extendify::fs {
 
 		template<typename T>
 		requires std::derived_from<T, IUnknown>
-		struct w_ptr_t: public std::unique_ptr<T, decltype([](T* ptr) {
+		struct UniqueIUnknown: public std::unique_ptr<T, decltype([](T* ptr) {
 												   if (ptr) {
 													   ptr->Release();
 												   }
 											   })> { };
 
 		class w_FileDialogEvents:
-			public w_ptr_t<IFileDialogEvents>,
+			public UniqueIUnknown<IFileDialogEvents>,
 			public IErrorCode {
 		  public:
 			constexpr static w_FileDialogEvents Create() {
@@ -286,39 +287,211 @@ namespace Extendify::fs {
 			}
 		};
 
-		class Iw_ShellItem: public IErrorCode {
+		class IDialogResult: public IErrorCode {
 		  public:
 			[[nodiscard]] virtual std::vector<std::filesystem::path>
 			getItems() = 0;
-			virtual ~Iw_ShellItem() = default;
+			virtual ~IDialogResult() = default;
 		};
 
-		class Iw_FileDialog: public IErrorCode {
+		class WrappedShellItem: public UniqueIUnknown<IShellItem>, public IDialogResult {
 		  public:
-			virtual HRESULT advise(w_FileDialogEvents& pfde,
-								   DWORD* pdwCookie) = 0;
-			virtual HRESULT advise(IFileDialogEvents* pfde,
-								   DWORD* pdwCookie) = 0;
-			[[nodiscard]] virtual std::unique_ptr<Iw_ShellItem> getResult() = 0;
-			virtual HRESULT getOptions(DWORD* pFlags) = 0;
-			virtual HRESULT setOptions(DWORD flags) = 0;
-			/// {{name, extension(s)}}
-			virtual HRESULT
-			setFileTypes(const FilePicker::FilePickerData& data) = 0;
-			virtual HRESULT setDefaultExtension(const std::wstring& ext) = 0;
-			virtual HRESULT setTitle(std::string title) = 0;
-			virtual HRESULT setStateId(const ids::ExtendifyId& id) = 0;
-			virtual HRESULT
-			setDefaultFolder(const std::filesystem::path& path) = 0;
-			virtual HRESULT show() = 0;
-			virtual ~Iw_FileDialog() = default;
+			[[nodiscard]] std::vector<std::filesystem::path>
+			getItems() override {
+				return {itemToPath(this->get())};
+			}
+
+		  private:
+			[[nodiscard]] static std::filesystem::path
+			itemToPath(IShellItem* item) {
+				LPWSTR pszName = nullptr;
+				auto hr = item->GetDisplayName(SIGDN_FILESYSPATH, &pszName);
+				if (FAILED(hr) || !pszName) {
+					logger.error(
+						"Failed to get display name of shell item: code: "
+						"{}, msg: {}",
+						hr,
+						errStrDialog(hr));
+					return {};
+				}
+				std::filesystem::path path(pszName);
+				CoTaskMemFree(pszName);
+				return std::move(path);
+			}
+			friend class WrappedShellItems;
+		};
+
+		class WrappedShellItems:
+			public UniqueIUnknown<IShellItemArray>,
+			public IDialogResult {
+		  public:
+			[[nodiscard]] std::vector<std::filesystem::path>
+			getItems() override {
+				E_ASSERT(this->get() && "ShellItems is not initialized");
+				std::vector<std::filesystem::path> items;
+				DWORD size = -1;
+				HRESULT hr = this->get()->GetCount(&size);
+				if (FAILED(hr)) {
+					logger.error(
+						"Failed to get count of shell items: code: {}, msg: {}",
+						hr,
+						errStrDialog(hr));
+					return items;
+				}
+				assert(size >= 0 && "ShellItems count is negative");
+				items.reserve(size);
+				IShellItem* item = nullptr;
+				for (auto i = 0; i < size; i++) {
+					hr = get()->GetItemAt(i, &item);
+					if (FAILED(hr)) {
+						logger.error(
+							"Failed to get shell item at index {}: code: "
+							"{}, msg: {}",
+							i,
+							hr,
+							errStrDialog(hr));
+						continue;
+					}
+					E_ASSERT(item && "ShellItem is null");
+					items.push_back(WrappedShellItem::itemToPath(item));
+				}
+				return std::move(items);
+			}
+		};
+
+		class IFileDialogBase: public IErrorCode {
+		  public:
+			virtual ~IFileDialogBase() = default;
+
+			// explicit foo(foo&& other) noexcept:
+			// 	w_ptr_t<T>(std::move(other)),
+			// 	IErrorCode(std::move(other)) {
+			// 	if (this == &other) {
+			// 		return;
+			// 	}
+			// 	advCookies = std::move(other.advCookies);
+			// 	dialogStrings = std::move(other.dialogStrings);
+			// 	title = std::move(other.title);
+			// 	defaultFolder = std::move(other.defaultFolder);
+			// 	filters = std::move(other.filters);
+			// }
+
+			// template<typename Other>
+			// requires std::derived_from<Other, T>
+			// foo<T>& operator=(foo<Other>&& other) noexcept {
+			// 	if (this != &other) {
+			// 		w_ptr_t<T>::operator=(std::move(other));
+			// 		advCookies = std::move(other.advCookies);
+			// 		dialogStrings = std::move(other.dialogStrings);
+			// 		title = std::move(other.title);
+			// 		defaultFolder = std::move(other.defaultFolder);
+			// 		filters = std::move(other.filters);
+			// 	}
+			// 	return *this;
+			// }
+
+			HRESULT advise(w_FileDialogEvents& pfde, DWORD* pdwCookie) {
+				return advise(pfde.get(), pdwCookie);
+			}
+
+			HRESULT advise(IFileDialogEvents* pfde, DWORD* pdwCookie) {
+				E_ASSERT(pfde && "pfde is null");
+				E_ASSERT(pdwCookie && "pdwCookie is null");
+				E_ASSERT(this->ptr() && "FileDialog is not initialized");
+				advCookies.insert(pdwCookie);
+				return this->ptr()->Advise(pfde, pdwCookie);
+			}
+
+			HRESULT getOptions(DWORD* pFlags) {
+				E_ASSERT(pFlags && "pFlags is null");
+				E_ASSERT(this->ptr() && "FileDialog is not initialized");
+				return this->ptr()->GetOptions(pFlags);
+			}
+
+			HRESULT setOptions(DWORD flags) {
+				E_ASSERT(this->ptr() && "FileDialog is not initialized");
+				return this->ptr()->SetOptions(flags);
+			}
+
+			HRESULT
+			setFileTypes(const FilePicker::FilePickerData& fileTypes) {
+				// doesnt change the capacity
+				dialogStrings.clear();
+				// each filter has a name and a patter, + 2 for default filter
+				dialogStrings.reserve(fileTypes.filters.size() * 2 + 2);
+
+				filters.clear();
+				filters.reserve(fileTypes.filters.size() + 1);
+
+				filters.push_back(transformFilter(fileTypes.defaultFilter));
+				for (const auto& filter : fileTypes.filters) {
+					filters.push_back(transformFilter(filter));
+				}
+
+				E_ASSERT(this->ptr() && "FileDialog is not initialized");
+				const auto hr =
+					this->ptr()->SetFileTypes(filters.size(), filters.data());
+				if (FAILED(hr)) {
+					return hr;
+				}
+				// we pass a 0-based array, but set the index as 1-based
+				// more:
+				// https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifiledialog-setfiletypeindex#parameters
+				return this->ptr()->SetFileTypeIndex(1);
+			}
+
+			HRESULT setTitle(std::string _title) {
+				E_ASSERT(this->ptr() && "FileDialog is not initialized");
+				if (_title.empty()) {
+					title = L"Open File(s)";
+				} else {
+					title = std::move(
+						util::string::stringToWstring(std::move(_title)));
+				}
+				return this->ptr()->SetTitle(title.c_str());
+			}
+
+			HRESULT setStateId(const ids::ExtendifyId& id) {
+				E_ASSERT(this->ptr() && "FileDialog is not initialized");
+				E_ASSERT(id && "id is null");
+				return this->ptr()->SetClientGuid(ids::extendifyIdToGUID(id));
+			}
+
+			HRESULT
+			setDefaultFolder(const std::filesystem::path& path) {
+				E_ASSERT(this->ptr() && "FileDialog is not initialized");
+				if (path.empty()) {
+					logger.warn("Default folder path is empty, skipping");
+					return S_OK;
+				}
+
+				auto hr = _setDefaultFolderInternal(path);
+				if (FAILED(hr)) {
+					return hr;
+				}
+				return this->ptr()->SetDefaultFolder(defaultFolder.get());
+			}
+
+			HRESULT show() {
+				E_ASSERT(this->ptr() && "FileDialog is not initialized");
+				return this->ptr()->Show(nullptr);
+			}
+
+			[[nodiscard]] virtual std::unique_ptr<IDialogResult> getResult() = 0;
 
 		  protected:
+			IFileDialogBase() = default;
+			[[nodiscard]] virtual IFileDialog* ptr() const noexcept = 0;
+			std::unordered_set<DWORD*> advCookies;
+
+		  private:
 			std::vector<std::wstring> dialogStrings;
 			std::wstring title;
-			w_ptr_t<IShellItem> defaultFolder;
+			UniqueIUnknown<IShellItem> defaultFolder;
+			std::vector<COMDLG_FILTERSPEC> filters;
 
-			HRESULT _setDefaultFolderItem(const std::filesystem::path& path) {
+			HRESULT
+			_setDefaultFolderInternal(const std::filesystem::path& path) {
 				IShellItem* tmp = nullptr;
 				auto ret = SHCreateItemFromParsingName(
 					path.c_str(), nullptr, IID_PPV_ARGS(&tmp));
@@ -357,104 +530,19 @@ namespace Extendify::fs {
 			}
 		};
 
-		class w_ShellItem: public w_ptr_t<IShellItem>, public Iw_ShellItem {
+		class OpenDialogImpl:
+			public UniqueIUnknown<IFileOpenDialog>,
+			public IFileDialogBase {
 		  public:
-			[[nodiscard]] std::vector<std::filesystem::path>
-			getItems() override {
-				return {itemToPath(this->get())};
-			}
-
-		  private:
-			[[nodiscard]] static std::filesystem::path
-			itemToPath(IShellItem* item) {
-				LPWSTR pszName = nullptr;
-				auto hr = item->GetDisplayName(SIGDN_FILESYSPATH, &pszName);
-				if (FAILED(hr) || !pszName) {
-					logger.error(
-						"Failed to get display name of shell item: code: "
-						"{}, msg: {}",
-						hr,
-						errStrDialog(hr));
-					return {};
-				}
-				std::filesystem::path path(pszName);
-				CoTaskMemFree(pszName);
-				return std::move(path);
-			}
-			friend class w_ShellItems;
-		};
-
-		class w_ShellItems:
-			public w_ptr_t<IShellItemArray>,
-			public Iw_ShellItem {
-		  public:
-			[[nodiscard]] std::vector<std::filesystem::path>
-			getItems() override {
-				E_ASSERT(this->get() && "ShellItems is not initialized");
-				std::vector<std::filesystem::path> items;
-				DWORD size = -1;
-				HRESULT hr = this->get()->GetCount(&size);
-				if (FAILED(hr)) {
-					logger.error(
-						"Failed to get count of shell items: code: {}, msg: {}",
-						hr,
-						errStrDialog(hr));
-					return items;
-				}
-				assert(size >= 0 && "ShellItems count is negative");
-				items.reserve(size);
-				IShellItem* item = nullptr;
-				for (auto i = 0; i < size; i++) {
-					hr = get()->GetItemAt(i, &item);
-					if (FAILED(hr)) {
-						logger.error(
-							"Failed to get shell item at index {}: code: "
-							"{}, msg: {}",
-							i,
-							hr,
-							errStrDialog(hr));
-						continue;
+			~OpenDialogImpl() override {
+				if (this->get())
+					for (auto& cookie : advCookies) {
+						this->get()->Unadvise(*cookie);
 					}
-					E_ASSERT(item && "ShellItem is null");
-					items.push_back(w_ShellItem::itemToPath(item));
-				}
-				return std::move(items);
-			}
-		};
-
-		class w_FileOpenDialog:
-			public w_ptr_t<IFileOpenDialog>,
-			public Iw_FileDialog {
-
-		  public:
-			w_FileOpenDialog():
-				w_ptr_t<IFileOpenDialog>(nullptr) {
 			}
 
-			w_FileOpenDialog(const w_FileOpenDialog& other) = delete;
-			w_FileOpenDialog& operator=(const w_FileOpenDialog& other) = delete;
-
-			w_FileOpenDialog(w_FileOpenDialog&& other) noexcept:
-				w_ptr_t<IFileOpenDialog>(std::move(other)),
-				advCookies(std::move(other.advCookies)) {
-			}
-
-			w_FileOpenDialog& operator=(w_FileOpenDialog&& other) noexcept {
-				if (this != &other) {
-					w_ptr_t<IFileOpenDialog>::operator=(std::move(other));
-					advCookies = std::move(other.advCookies);
-				}
-				return *this;
-			}
-
-			~w_FileOpenDialog() {
-				for (auto& cookie : advCookies) {
-					get()->Unadvise(*cookie);
-				}
-			}
-
-			constexpr static std::unique_ptr<w_FileOpenDialog> Create() {
-				auto dialog = std::make_unique<w_FileOpenDialog>();
+			constexpr static std::unique_ptr<OpenDialogImpl> Create() {
+				auto dialog = std::make_unique<OpenDialogImpl>();
 				IFileOpenDialog* tmp = nullptr;
 				dialog->code = CoCreateInstance(CLSID_FileOpenDialog,
 												nullptr,
@@ -464,139 +552,33 @@ namespace Extendify::fs {
 				return dialog;
 			}
 
-			HRESULT advise(w_FileDialogEvents& pfde,
-						   DWORD* pdwCookie) override {
-				return advise(pfde.get(), pdwCookie);
-			}
-
-			HRESULT advise(IFileDialogEvents* pfde, DWORD* pdwCookie) override {
-				E_ASSERT(pfde && "pfde is null");
-				E_ASSERT(pdwCookie && "pdwCookie is null");
-				E_ASSERT(this->get() && "FileDialog is not initialized");
-				advCookies.insert(pdwCookie);
-				return this->get()->Advise(pfde, pdwCookie);
-			}
-
-			[[nodiscard]] std::unique_ptr<Iw_ShellItem> getResult() override {
-				E_ASSERT(this->get() && "FileDialog is not initialized");
-				auto ret = std::make_unique<w_ShellItems>();
+			[[nodiscard]] std::unique_ptr<IDialogResult> getResult() override {
+				E_ASSERT(get() && "FileOpenDialog is not initialized");
+				auto ret = std::make_unique<WrappedShellItems>();
 				IShellItemArray* tmp = nullptr;
-				ret->code = this->get()->GetResults(&tmp);
+				ret->code = get()->GetResults(&tmp);
 				ret->reset(tmp);
 				return ret;
 			}
 
-			HRESULT getOptions(DWORD* pFlags) override {
-				E_ASSERT(pFlags && "pFlags is null");
-				E_ASSERT(this->get() && "FileDialog is not initialized");
-				return this->get()->GetOptions(pFlags);
+		  protected:
+			[[nodiscard]] IFileOpenDialog* ptr() const noexcept override {
+				E_ASSERT(this->get() && "FileOpenDialog is not initialized");
+				return this->get();
 			}
-
-			HRESULT setOptions(DWORD flags) override {
-				E_ASSERT(this->get() && "FileDialog is not initialized");
-				return this->get()->SetOptions(flags);
-			}
-
-			HRESULT
-			setFileTypes(const FilePicker::FilePickerData& fileTypes) override {
-				// doesnt change the capacity
-				dialogStrings.clear();
-				// each filter has a name and a patter, + 2 for default filter
-				dialogStrings.reserve(fileTypes.filters.size() * 2 + 2);
-
-				filters.clear();
-				filters.reserve(fileTypes.filters.size() + 1);
-
-				filters.push_back(transformFilter(fileTypes.defaultFilter));
-				for (const auto& filter : fileTypes.filters) {
-					filters.push_back(transformFilter(filter));
-				}
-
-				E_ASSERT(get() && "FileDialog is not initialized");
-				const auto hr =
-					get()->SetFileTypes(filters.size(), filters.data());
-				if (FAILED(hr)) {
-					return hr;
-				}
-				// we pass a 0-based array, but set the index as 1-based
-				// more:
-				// https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifiledialog-setfiletypeindex#parameters
-				return get()->SetFileTypeIndex(1);
-			}
-
-			HRESULT setDefaultExtension(const std::wstring& ext) override {
-				E_ASSERT(get() && "FileDialog is not initialized");
-				return get()->SetDefaultExtension(ext.c_str());
-			}
-
-			HRESULT setTitle(std::string _title) override {
-				E_ASSERT(get() && "FileDialog is not initialized");
-				if (_title.empty()) {
-					title = L"Open File(s)";
-				} else {
-					title = std::move(
-						util::string::stringToWstring(std::move(_title)));
-				}
-				return get()->SetTitle(title.c_str());
-			}
-
-			HRESULT setStateId(const ids::ExtendifyId& id) override {
-				E_ASSERT(get() && "FileDialog is not initialized");
-				E_ASSERT(id && "id is null");
-				return get()->SetClientGuid(ids::extendifyIdToGUID(id));
-			}
-
-			HRESULT
-			setDefaultFolder(const std::filesystem::path& path) override {
-				E_ASSERT(get() && "FileDialog is not initialized");
-				if (path.empty()) {
-					logger.warn("Default folder path is empty, skipping");
-					return S_OK;
-				}
-
-				auto hr = _setDefaultFolderItem(path);
-				if (FAILED(hr)) {
-					return hr;
-				}
-				return get()->SetDefaultFolder(defaultFolder.get());
-			}
-
-			HRESULT show() override {
-				E_ASSERT(get() && "FileDialog is not initialized");
-				return get()->Show(nullptr);
-			}
-
-		  private:
-			std::unordered_set<DWORD*> advCookies;
-			std::vector<COMDLG_FILTERSPEC> filters;
 		};
 
-		class w_FileSaveDialog:
-			public w_ptr_t<IFileSaveDialog>,
-			public Iw_FileDialog {
+		class SaveDialogImpl: UniqueIUnknown<IFileSaveDialog>, public IFileDialogBase {
 		  public:
-			w_FileSaveDialog():
-				w_ptr_t<IFileSaveDialog>(nullptr) {
+			~SaveDialogImpl() override {
+				if (this->get())
+					for (auto& cookie : advCookies) {
+						this->get()->Unadvise(*cookie);
+					}
 			}
 
-			w_FileSaveDialog(const w_FileSaveDialog& other) = delete;
-			w_FileSaveDialog& operator=(const w_FileSaveDialog& other) = delete;
-
-			w_FileSaveDialog(w_FileSaveDialog&& other) noexcept:
-				w_ptr_t<IFileSaveDialog>(std::move(other)),
-				advCookies(std::move(other.advCookies)) {
-			}
-
-			w_FileSaveDialog& operator=(w_FileSaveDialog&& other) noexcept {
-				if (this != &other) {
-					w_ptr_t<IFileSaveDialog>::operator=(std::move(other));
-					advCookies = std::move(other.advCookies);
-				}
-				return *this;
-			}
-
-			constexpr static std::unique_ptr<w_FileSaveDialog> Create() {
-				auto dialog = std::make_unique<w_FileSaveDialog>();
+			constexpr static std::unique_ptr<SaveDialogImpl> Create() {
+				auto dialog = std::make_unique<SaveDialogImpl>();
 				IFileSaveDialog* tmp = nullptr;
 				dialog->code = CoCreateInstance(CLSID_FileSaveDialog,
 												nullptr,
@@ -606,111 +588,20 @@ namespace Extendify::fs {
 				return dialog;
 			}
 
-			HRESULT advise(w_FileDialogEvents& pfde,
-						   DWORD* pdwCookie) override {
-				return advise(pfde.get(), pdwCookie);
-			}
-
-			HRESULT advise(IFileDialogEvents* pfde, DWORD* pdwCookie) override {
-				E_ASSERT(pfde && "pfde is null");
-				E_ASSERT(pdwCookie && "pdwCookie is null");
-				E_ASSERT(this->get() && "FileDialog is not initialized");
-				advCookies.insert(pdwCookie);
-				return this->get()->Advise(pfde, pdwCookie);
-			}
-
-			[[nodiscard]] std::unique_ptr<Iw_ShellItem> getResult() override {
-				E_ASSERT(this->get() && "FileSaveDialog is not initialized");
-				auto ret = std::make_unique<w_ShellItem>();
+			[[nodiscard]] std::unique_ptr<IDialogResult> getResult() override {
+				E_ASSERT(get() && "FileSaveDialog is not initialized");
+				auto ret = std::make_unique<WrappedShellItem>();
 				IShellItem* tmp = nullptr;
-				ret->code = this->get()->GetResult(&tmp);
+				ret->code = get()->GetResult(&tmp);
 				ret->reset(tmp);
 				return ret;
 			}
 
-			HRESULT getOptions(DWORD* pFlags) override {
-				E_ASSERT(pFlags && "pFlags is null");
-				E_ASSERT(this->get() && "FileDialog is not initialized");
-				return this->get()->GetOptions(pFlags);
+		  protected:
+			[[nodiscard]] IFileSaveDialog* ptr() const noexcept override {
+				E_ASSERT(this->get() && "FileOpenDialog is not initialized");
+				return this->get();
 			}
-
-			HRESULT setOptions(DWORD flags) override {
-				E_ASSERT(this->get() && "FileDialog is not initialized");
-				return this->get()->SetOptions(flags);
-			}
-
-			HRESULT
-			setFileTypes(const FilePicker::FilePickerData& fileTypes) override {
-				// doesnt change the capacity
-				dialogStrings.clear();
-				// each filter has a name and a patter, + 2 for default filter
-				dialogStrings.reserve(fileTypes.filters.size() * 2 + 2);
-
-				filters.clear();
-				filters.reserve(fileTypes.filters.size() + 1);
-
-				filters.push_back(transformFilter(fileTypes.defaultFilter));
-				for (const auto& filter : fileTypes.filters) {
-					filters.push_back(transformFilter(filter));
-				}
-
-				E_ASSERT(get() && "FileDialog is not initialized");
-				const auto hr =
-					get()->SetFileTypes(filters.size(), filters.data());
-				if (FAILED(hr)) {
-					return hr;
-				}
-				// we pass a 0-based array, but set the index as 1-based
-				// more:
-				// https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifiledialog-setfiletypeindex#parameters
-				return get()->SetFileTypeIndex(1);
-			}
-
-			HRESULT setDefaultExtension(const std::wstring& ext) override {
-				E_ASSERT(get() && "FileDialog is not initialized");
-				return get()->SetDefaultExtension(ext.c_str());
-			}
-
-			HRESULT setTitle(std::string _title) override {
-				E_ASSERT(get() && "FileDialog is not initialized");
-				if (_title.empty()) {
-					title = L"Save File";
-				} else {
-					title = std::move(
-						util::string::stringToWstring(std::move(_title)));
-				}
-				return get()->SetTitle(title.c_str());
-			}
-
-			HRESULT setStateId(const ids::ExtendifyId& id) override {
-				E_ASSERT(get() && "FileDialog is not initialized");
-				E_ASSERT(id && "id is null");
-				return get()->SetClientGuid(ids::extendifyIdToGUID(id));
-			}
-
-			HRESULT
-			setDefaultFolder(const std::filesystem::path& path) override {
-				E_ASSERT(get() && "FileDialog is not initialized");
-				if (path.empty()) {
-					logger.warn("Default folder path is empty, skipping");
-					return S_OK;
-				}
-
-				auto hr = _setDefaultFolderItem(path);
-				if (FAILED(hr)) {
-					return hr;
-				}
-				return get()->SetDefaultFolder(defaultFolder.get());
-			}
-
-			HRESULT show() override {
-				E_ASSERT(get() && "FileDialog is not initialized");
-				return get()->Show(nullptr);
-			}
-
-		  private:
-			std::unordered_set<DWORD*> advCookies;
-			std::vector<COMDLG_FILTERSPEC> filters;
 		};
 
 	} // namespace
@@ -804,7 +695,8 @@ namespace Extendify::fs {
 												std::move(self), paths, err);
 										} catch (std::exception& e) {
 											const auto msg = std::format(
-												"Error in FilePicker promise "
+												"Error in FilePicker "
+												"promise "
 												"callback: {}",
 												e.what());
 											logger.error(msg);
@@ -862,11 +754,11 @@ namespace Extendify::fs {
 	}
 		auto isSave = data.mode == DialogType::SAVE;
 		// CoCreate the File Open Dialog object.
-		std::unique_ptr<Iw_FileDialog> fileDialog;
+		std::unique_ptr<IFileDialogBase> fileDialog;
 		if (isSave) {
-			fileDialog = w_FileSaveDialog::Create();
+			fileDialog = SaveDialogImpl::Create();
 		} else {
-			fileDialog = w_FileOpenDialog::Create();
+			fileDialog = OpenDialogImpl::Create();
 		}
 
 		E_CHECK_ERR(fileDialog->code);
@@ -926,6 +818,10 @@ namespace Extendify::fs {
 		// E_CHECK_ERR(hr);
 		// Show the dialog
 		hr = fileDialog->show();
+		if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+			// user cancelled the dialog
+			return {};
+		}
 		E_CHECK_ERR(hr);
 		// Obtain the result once the user clicks
 		// the 'Open' button.

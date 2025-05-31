@@ -10,6 +10,7 @@
 #include <functional>
 #include <include/internal/cef_ptr.h>
 #include <memory>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 
@@ -35,19 +36,22 @@ namespace Extendify::fs {
 			const int watchId;
 		};
 
-		Watcher();
 		typedef std::function<void(std::unique_ptr<Event>)> Callback;
+		Watcher();
+		~Watcher();
 		/**
 		 * @brief Adds a file to the watcher
 		 *
 		 * @param path the file path to be watched
-		 * @param callback the callback to be called when the file is changed/created/deleted
-		 * **The callback will be called on the watcher thread**, wrap with something that posts a
-		 * task if you need to run it on any other thread
-		 * @return a unique, non-negative, non-zero id for this file/callback pair, use it to remove
-		 * the watcher
+		 * @param callback the callback to be called when the file is
+		 * changed/created/deleted
+		 * **The callback will be called on the watcher thread**, wrap with
+		 * something that posts a task if you need to run it on any other thread
+		 * @return a unique, non-negative, non-zero id for this file/callback
+		 * pair, use it to remove the watcher
 		 */
-		int addFile(const std::filesystem::path& path, const Callback& callback);
+		int addFile(const std::filesystem::path& path,
+					const Callback& callback);
 
 		/**
 		 * @brief Removes a file from the watcher
@@ -63,20 +67,22 @@ namespace Extendify::fs {
 		 * cef_initialize being killed for sandbox reasons
 		 */
 		void init();
-		
+
 	  private:
 		static log::Logger logger;
-		[[noreturn]] void runLoop();
+		void runLoop();
 		std::atomic_bool running;
+		std::atomic_bool shutdown = false;
 
-		CefRefPtr<CefThread> watchingThread;
+		std::unique_ptr<std::jthread> watchingThread;
 #ifdef _WIN32
-		CefRefPtr<CefThread> eventThread;
+		std::unique_ptr<std::jthread> eventThread;
 
 		class Dir {
 		  public:
 			char buf[2 << 12];
-			int addFile(const std::filesystem::path& path, const Callback& callback);
+			int addFile(const std::filesystem::path& path,
+						const Callback& callback);
 			void removeFile(int id);
 			void watch();
 			Dir() = delete;
@@ -111,7 +117,7 @@ namespace Extendify::fs {
 		std::mutex pendingEventsMutex;
 		std::deque<std::pair<std::filesystem::path, Reason>> pendingEvents;
 
-		[[noreturn]] void processEvents();
+		void processEvents();
 		/**
 		 * @brief triggered when a file is changed
 		 */
@@ -139,12 +145,13 @@ struct std::formatter<Extendify::fs::Watcher::Event> {
 			ok = true;
 			return ctx.end();
 		}
-		throw std::format_error(
-			"No format specifiers are supported for Extendify::fs::Watcher::Event");
+		throw std::format_error("No format specifiers are supported for "
+								"Extendify::fs::Watcher::Event");
 	}
 
 	template<typename FmtCtx>
-	FmtCtx::iterator format(const Extendify::fs::Watcher::Event& event, FmtCtx& ctx) const {
+	FmtCtx::iterator format(const Extendify::fs::Watcher::Event& event,
+							FmtCtx& ctx) const {
 		if (!ok) {
 			unreachable();
 		}
@@ -169,13 +176,14 @@ struct std::formatter<std::unique_ptr<Extendify::fs::Watcher::Event>> {
 			ok = true;
 			return ctx.end();
 		}
-		throw std::format_error(
-			"No format specifiers are supported for Extendify::fs::Watcher::Event");
+		throw std::format_error("No format specifiers are supported for "
+								"Extendify::fs::Watcher::Event");
 	}
 
 	template<typename FmtCtx>
-	FmtCtx::iterator format(const std::unique_ptr<Extendify::fs::Watcher::Event>& event,
-							FmtCtx& ctx) const {
+	FmtCtx::iterator
+	format(const std::unique_ptr<Extendify::fs::Watcher::Event>& event,
+		   FmtCtx& ctx) const {
 		if (!ok) {
 			unreachable();
 		}
@@ -200,12 +208,13 @@ struct std::formatter<Extendify::fs::Watcher::Reason> {
 			ok = true;
 			return ctx.end();
 		}
-		throw std::format_error(
-			"No format specifiers are supported for Extendify::fs::Watcher::Event");
+		throw std::format_error("No format specifiers are supported for "
+								"Extendify::fs::Watcher::Event");
 	}
 
 	template<typename FmtCtx>
-	FmtCtx::iterator format(const Extendify::fs::Watcher::Reason& event, FmtCtx& ctx) const {
+	FmtCtx::iterator format(const Extendify::fs::Watcher::Reason& event,
+							FmtCtx& ctx) const {
 		if (!ok) {
 			unreachable();
 		}

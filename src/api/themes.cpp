@@ -2,6 +2,7 @@
 
 #include "api/util/CBHandler.hpp"
 #include "fs/FilePicker.hpp"
+#include "main.hpp"
 #include "path/path.hpp"
 #include "util/APIFunction.hpp"
 #include "util/APIUsage.hpp"
@@ -84,19 +85,19 @@ namespace Extendify::api::themes {
 		   CefString& exception) {
 			try {
 				usage::uploadTheme.validateOrThrow(arguments);
-				auto picker = fs::FilePicker::Create({
-					.mode = fs::FilePicker::DialogType::OPEN,
-					.title = "Select a theme file to upload",
-					.filters = {{
-						.displayName = "All Files",
-						.patterns = {"*.*"},
-					}},
-					.defaultFilter =
-						{
-							.displayName = "CSS Files",
-							.patterns = {"*.css", "*.theme.css"},
-						},
-				});
+				auto picker = fs::FilePicker::Create(
+					{.mode = fs::FilePicker::DialogType::OPEN,
+					 .title = "Select a theme file to upload",
+					 .filters = {{
+						 .displayName = "All Files",
+						 .patterns = {"*.*"},
+					 }},
+					 .defaultFilter =
+						 {
+							 .displayName = "CSS Files",
+							 .patterns = {"*.css", "*.theme.css"},
+						 },
+					 .stateId = ids::THEMES});
 				retval = picker->promise(
 					CefV8Context::GetCurrentContext(),
 					[](CefRefPtr<fs::FilePicker> picker,
