@@ -1,5 +1,6 @@
 #include "ScopedV8Context.hpp"
 #include "log/log.hpp"
+#include <cef_v8.h>
 
 namespace Extendify::api::util {
 	ScopedV8Context::ScopedV8Context(CefRefPtr<CefV8Context> context):
@@ -10,7 +11,7 @@ namespace Extendify::api::util {
 						false
 						&& "trying to use ScopedV8Context with an invalid context");
 			}
-			if (CefV8Context::GetEnteredContext()->IsSame(this->context)) {
+			if (CefV8Context::InContext() && CefV8Context::GetEnteredContext()->IsSame(this->context)) {
 				shouldExit = false;
 			} else {
 				context->Enter();
