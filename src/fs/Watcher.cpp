@@ -179,8 +179,8 @@ std::atomic_int Watcher::Dir::nextId = 1;
 Watcher::Dir::Dir(std::filesystem::path baseDir, HANDLE onChange):
 	buf(),
 	baseDir(std::move(baseDir)),
-	overlapped(),
-	onChange(onChange) {
+	onChange(onChange),
+	overlapped() {
 
 	HANDLE _baseDirHandle =
 		CreateFile(this->baseDir.string().c_str(),

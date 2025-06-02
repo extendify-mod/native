@@ -46,7 +46,6 @@ namespace Extendify::api::util {
 							   arguments.size());
 		}
 		for (auto i = 0; i < arguments.size(); i++) {
-			const auto& arg = arguments[i];
 			if (getV8Type(arguments[i]) != func.expectedArgs[i]) {
 				goto err;
 			}

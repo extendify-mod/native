@@ -85,7 +85,7 @@ fs::path path::getThemesDir(bool createIfNeeded) {
 	if (createIfNeeded) {
 		ensureDir(themesPath);
 	}
-	return std::move(themesPath);
+	return themesPath;
 }
 
 bool path::ensureDir(const std::filesystem::path& path) {

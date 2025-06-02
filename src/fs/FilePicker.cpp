@@ -27,7 +27,7 @@ const static Extendify::log::Logger logger {{"Extendify", "api", "FilePicker"}};
 namespace Extendify::fs {
 
 	namespace {
-		class CDialogEventHandler:
+		class CDialogEventHandler final:
 			public IFileDialogEvents,
 			public IFileDialogControlEvents {
 		  public:
@@ -36,7 +36,7 @@ namespace Extendify::fs {
 				static const QITAB qit[] = {
 					QITABENT(CDialogEventHandler, IFileDialogEvents),
 					QITABENT(CDialogEventHandler, IFileDialogControlEvents),
-					{0},
+					{},
 #pragma warning(suppress : 4838)
 				};
 				return QISearch(this, qit, riid, ppv);
@@ -120,7 +120,7 @@ namespace Extendify::fs {
 			static constexpr int INDEX_WEBPAGE = 2;
 			static constexpr int INDEX_TEXTDOC = 3;
 			// Controls
-			static constexpr int CONTROL_GROUP = 2000;
+			// static constexpr int CONTROL_GROUP = 2000;
 			static constexpr int CONTROL_RADIOBUTTONLIST = 2;
 			static constexpr int CONTROL_RADIOBUTTON1 = 1;
 			static constexpr int CONTROL_RADIOBUTTON2 =
@@ -268,10 +268,10 @@ namespace Extendify::fs {
 		template<typename T>
 		requires std::derived_from<T, IUnknown>
 		struct UniqueIUnknown: public std::unique_ptr<T, decltype([](T* ptr) {
-												   if (ptr) {
-													   ptr->Release();
-												   }
-											   })> { };
+														  if (ptr) {
+															  ptr->Release();
+														  }
+													  })> { };
 
 		class w_FileDialogEvents:
 			public UniqueIUnknown<IFileDialogEvents>,
@@ -283,7 +283,7 @@ namespace Extendify::fs {
 				events.code =
 					CDialogEventHandler::CreateInstance(IID_PPV_ARGS(&tmp));
 				events.reset(tmp);
-				return std::move(events);
+				return events;
 			}
 		};
 
@@ -294,7 +294,9 @@ namespace Extendify::fs {
 			virtual ~IDialogResult() = default;
 		};
 
-		class WrappedShellItem: public UniqueIUnknown<IShellItem>, public IDialogResult {
+		class WrappedShellItem:
+			public UniqueIUnknown<IShellItem>,
+			public IDialogResult {
 		  public:
 			[[nodiscard]] std::vector<std::filesystem::path>
 			getItems() override {
@@ -316,7 +318,7 @@ namespace Extendify::fs {
 				}
 				std::filesystem::path path(pszName);
 				CoTaskMemFree(pszName);
-				return std::move(path);
+				return path;
 			}
 			friend class WrappedShellItems;
 		};
@@ -355,7 +357,7 @@ namespace Extendify::fs {
 					E_ASSERT(item && "ShellItem is null");
 					items.push_back(WrappedShellItem::itemToPath(item));
 				}
-				return std::move(items);
+				return items;
 			}
 		};
 
@@ -445,8 +447,7 @@ namespace Extendify::fs {
 				if (_title.empty()) {
 					title = L"Open File(s)";
 				} else {
-					title = std::move(
-						util::string::stringToWstring(std::move(_title)));
+					title = util::string::stringToWstring(std::move(_title));
 				}
 				return this->ptr()->SetTitle(title.c_str());
 			}
@@ -477,7 +478,8 @@ namespace Extendify::fs {
 				return this->ptr()->Show(nullptr);
 			}
 
-			[[nodiscard]] virtual std::unique_ptr<IDialogResult> getResult() = 0;
+			[[nodiscard]] virtual std::unique_ptr<IDialogResult>
+			getResult() = 0;
 
 		  protected:
 			IFileDialogBase() = default;
@@ -568,7 +570,9 @@ namespace Extendify::fs {
 			}
 		};
 
-		class SaveDialogImpl: UniqueIUnknown<IFileSaveDialog>, public IFileDialogBase {
+		class SaveDialogImpl:
+			UniqueIUnknown<IFileSaveDialog>,
+			public IFileDialogBase {
 		  public:
 			~SaveDialogImpl() override {
 				if (this->get())

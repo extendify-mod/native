@@ -47,8 +47,13 @@ endif()
 target_include_directories(extendify PRIVATE "${SRC_DIR}")
 set_property(TARGET extendify PROPERTY CXX_STANDARD 23)
 include(cmake/compilerChecks.cmake)
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  
+target_compile_options(extendify PRIVATE -Wall -Wextra -Wpedantic)
+# ingore annoying warnings
+target_compile_options(extendify PRIVATE -Wno-unused-parameter)
+target_compile_options(extendify PRIVATE -Wno-sign-compare)
 
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
 elseif(SUPPORTS_GDWARF)
   target_compile_options(extendify PUBLIC -gdwarf)
 else()

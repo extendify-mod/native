@@ -30,7 +30,7 @@ namespace Extendify::util::string {
 				}
 				res.emplace_back(1, c);
 			}
-			return std::move(res);
+			return res;
 		}
 		auto lastPos = 0uz;
 		auto nextPos = str.find(delimiter, lastPos);
@@ -48,7 +48,7 @@ namespace Extendify::util::string {
 				res.emplace_back();
 			}
 		}
-		return std::move(res);
+		return res;
 	}
 
 	[[nodiscard]] std::vector<std::string>
@@ -83,7 +83,7 @@ namespace Extendify::util::string {
 				break;
 			}
 		}
-		return std::move(res);
+		return res;
 	};
 
 	constexpr static std::string whitespaceChars = " \t\n\r";
@@ -124,7 +124,7 @@ namespace Extendify::util::string {
 
 	void replace(std::string& str, const std::basic_regex<char>& regex,
 				 const std::string& replacement) {
-		str = std::move(std::regex_replace(str, regex, replacement));
+		str = std::regex_replace(str, regex, replacement);
 	}
 
 	std::string wstringToString(std::wstring wstr) {

@@ -270,7 +270,7 @@ namespace Extendify::api::themes {
 		theme.source = previousThemeData.source;
 		theme.website = previousThemeData.website;
 		theme.invite = previousThemeData.invite;
-		return std::move(theme);
+		return theme;
 	}
 
 	UserTheme getThemeInfo(const std::string& css,
@@ -279,17 +279,17 @@ namespace Extendify::api::themes {
 		if (css.empty()) {
 			logger.warn("making theme info for empty css with filename: {}",
 						fileName);
-			return std::move(makeHeader(fileName, theme));
+			return makeHeader(fileName, theme);
 		}
 		std::string block;
 		{
 			const auto first = string::split(css, "/**", {.limit = 2});
 			if (first.size() < 2) {
-				return std::move(makeHeader(fileName, theme));
+				return makeHeader(fileName, theme);
 			}
 			const auto end = string::split(first[1], "*/", {.limit = 1});
 			if (!end.size()) {
-				return std::move(makeHeader(fileName, theme));
+				return makeHeader(fileName, theme);
 			}
 			block = end[0];
 		}
@@ -319,7 +319,7 @@ namespace Extendify::api::themes {
 		}
 		string::trim(accum);
 		theme.set(field, std::move(accum));
-		return std::move(makeHeader(fileName, theme));
+		return makeHeader(fileName, theme);
 	}
 
 } // namespace Extendify::api::themes

@@ -48,7 +48,7 @@ namespace Extendify::fs {
 
 		struct FilePickerData {
 			const DialogType mode = DialogType::OPEN;
-			const std::string title;
+			const std::string title{};
 
 			/**
 			 * @brief folder path to open the dialog in
@@ -56,8 +56,8 @@ namespace Extendify::fs {
 			 * @invariant must exist
 			 * @invariant must be a directory
 			 */
-			const std::filesystem::path defaultFolderPath;
-			const std::vector<FileFilter> filters;
+			const std::filesystem::path defaultFolderPath{};
+			const std::vector<FileFilter> filters{};
 			/**
 			 * @brief the default file filter
 			 *
