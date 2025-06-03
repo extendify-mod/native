@@ -52,7 +52,7 @@ namespace Extendify::fs {
 		 */
 		int addFile(const std::filesystem::path& path,
 					const Callback& callback);
-
+		int addDir(const std::filesystem::path& path, const Callback& callback);
 		/**
 		 * @brief Removes a file from the watcher
 		 *
@@ -83,7 +83,8 @@ namespace Extendify::fs {
 			char buf[2 << 12];
 			int addFile(const std::filesystem::path& path,
 						const Callback& callback);
-			void removeFile(int id);
+			int addDir(const Callback& callback);
+			void removeWatch(int id);
 			void watch();
 			Dir() = delete;
 			Dir(std::filesystem::path baseDir, HANDLE onChange);
@@ -99,6 +100,7 @@ namespace Extendify::fs {
 			std::unordered_map<std::filesystem::path, std::vector<int>> ids;
 			std::mutex callbacksMutex;
 			std::unordered_map<int, Callback> callbacks;
+			std::unordered_map<int, Callback> recursiveCallbacks;
 			/**
 			 * @brief used to generate the next id, starts at 1
 			 *
@@ -115,7 +117,7 @@ namespace Extendify::fs {
 		std::unordered_map<std::filesystem::path, std::unique_ptr<Dir>> dirs;
 
 		std::mutex pendingEventsMutex;
-		std::deque<std::pair<std::filesystem::path, Reason>> pendingEvents;
+		std::deque<std::tuple<std::filesystem::path, Reason, std::filesystem::path>> pendingEvents;
 
 		void processEvents();
 		/**

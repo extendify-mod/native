@@ -114,6 +114,22 @@ int Watcher::addFile(const std::filesystem::path& path,
 #endif
 }
 
+int Watcher::addDir(const std::filesystem::path& path,
+					const Callback& callback) {
+	if (path.empty()) {
+		throw std::invalid_argument("Path cannot be empty");
+	}
+	if (callback == nullptr) {
+		throw std::invalid_argument("Callback cannot be null");
+	}
+	logger.info("Adding directory to watcher: {}", path.string());
+	if (!dirs.contains(path)) {
+		dirs.emplace(path, std::make_unique<Dir>(path, onChange));
+		dirs[path]->watch();
+	}
+	return dirs[path]->addDir(callback);
+}
+
 void Watcher::runLoop() {
 #ifdef _WIN32
 	DWORD bytesTransferred;
@@ -162,7 +178,8 @@ void Watcher::runLoop() {
 				std::filesystem::path filename(dir->baseDir);
 				filename /=
 					{{cur->FileName, cur->FileNameLength / sizeof(WCHAR)}};
-				pendingEvents.emplace_back(std::move(filename), reason);
+				pendingEvents.emplace_back(
+					std::move(filename), reason, dir->baseDir);
 				offset += cur->NextEntryOffset;
 			} while (cur->NextEntryOffset);
 			dir->watch();
@@ -211,7 +228,7 @@ void Watcher::Dir::watch() {
 	if (!ReadDirectoryChangesW(baseDirHandle,
 							   &buf,
 							   sizeof(buf),
-							   false,
+							   true,
 							   events,
 							   nullptr,
 							   &overlapped,
@@ -246,7 +263,21 @@ int Watcher::Dir::addFile(const std::filesystem::path& path,
 	return id;
 }
 
-void Watcher::Dir::removeFile(int id) {
+int Watcher::Dir::addDir(const Callback& callback) {
+	E_ASSERT(callback != nullptr && "Callback cannot be null");
+	std::scoped_lock lock(callbacksMutex, idsMutex, pathsMutex);
+	auto id = ++nextId;
+	if (ids.contains(baseDir)) {
+		ids[baseDir].push_back(id);
+	} else {
+		ids[baseDir] = {id};
+	}
+	paths[id] = baseDir;
+	recursiveCallbacks[id] = callback;
+	return id;
+}
+
+void Watcher::Dir::removeWatch(int id) {
 	{
 		std::scoped_lock lock(callbacksMutex);
 		if (callbacks.contains(id)) {
@@ -292,10 +323,9 @@ void Watcher::processEvents() {
 				throw std::runtime_error(msg);
 			}
 			std::scoped_lock lock(pendingEventsMutex, dirsMutex);
-			for (const auto& [path, reason] : pendingEvents) {
-				const auto dirname = path.parent_path();
-				if (dirs.contains(dirname)) {
-					const auto& dir = dirs[dirname];
+			for (const auto& [path, reason, dirpath] : pendingEvents) {
+				if (dirs.contains(dirpath)) {
+					const auto& dir = dirs[dirpath];
 					std::scoped_lock lock(dir->idsMutex);
 					if (dir->ids.contains(path)) {
 						const auto& vec = dir->ids[path];
@@ -304,10 +334,11 @@ void Watcher::processEvents() {
 								std::make_unique<Event>(path, reason, id),
 								dir->callbacks[id]);
 						}
-					} else {
-						logger.warn("Recieved event for path {} but no id "
-									"registered for it, ignoring it",
-									path.string());
+					}
+					for (const auto& [id, callback] : dir->recursiveCallbacks) {
+						toProcess.emplace_back(
+							std::make_unique<Event>(path, reason, id),
+							callback);
 					}
 				} else {
 					logger.warn("Recieved event for path {} but no directory "

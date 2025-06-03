@@ -32,6 +32,7 @@ namespace Extendify::api::themes {
 	struct UserTheme {
 		std::string fileName;
 		std::string name;
+		std::string content;
 		std::string author = "Unknown Author"; // Default to Unknown Author if not specified
 		std::string description =
 			"An Extendify Theme"; // Default to An Extendify Theme if not specified
@@ -41,6 +42,12 @@ namespace Extendify::api::themes {
 		std::optional<std::string> website;
 		std::optional<std::string> invite;
 		void set(const std::string& field, std::string value);
+		[[nodiscard]] CefRefPtr<CefV8Value> toJSON() const;
+		UserTheme() = default;
+		UserTheme(const UserTheme&) = default;
+		UserTheme(UserTheme&&) noexcept = default;
+		UserTheme& operator=(const UserTheme&) = default;
+		UserTheme& operator=(UserTheme&&) noexcept = default;
 	};
 
 	[[nodiscard]] UserTheme getThemeInfo(const std::string& css, const std::string& fileName);

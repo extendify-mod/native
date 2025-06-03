@@ -661,8 +661,10 @@ namespace Extendify::fs {
 	}
 
 	void FilePicker::runFilePicker() {
-		pickerThread =
-			CefThread::CreateThread(std::format("FilePicker-{}", nextId++));
+		if (!pickerThread || !pickerThread->IsRunning()) {
+			pickerThread =
+				CefThread::CreateThread(std::format("FilePicker-{}", nextId++));
+		}
 		pickerThread->GetTaskRunner()->PostTask(
 			util::TaskCBHandler::Create([this]() {
 				auto res = showDialog();
