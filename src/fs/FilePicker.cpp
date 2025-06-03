@@ -11,20 +11,21 @@
 #include <concepts>
 #include <internal/cef_types.h>
 #include <memory>
-#include <shobjidl_core.h>
-#include <winnt.h>
 
 #ifdef _WIN32
 #include <windows.h>
 #define STRICT_TYPED_ITEMIDS
 #include <shlwapi.h>
 #include <shobjidl.h>
+#include <shobjidl_core.h>
+#include <winnt.h>
 
 #endif
 
-#ifdef _WIN32
 const static Extendify::log::Logger logger {{"Extendify", "api", "FilePicker"}};
+
 namespace Extendify::fs {
+#ifdef _WIN32
 
 	namespace {
 		class CDialogEventHandler final:
@@ -839,6 +840,8 @@ namespace Extendify::fs {
 		return paths;
 
 #undef E_CHECK_ERR
+#elif defined(__linux__)
+		return std::unexpected("Not implemented on Linux");
 #endif
 	}
 

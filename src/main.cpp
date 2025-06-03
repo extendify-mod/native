@@ -18,15 +18,11 @@ namespace Extendify {
 	log::Logger logger({"Extendify"});
 
 	Status runStart() {
-		logger.trace("runStart started");
-
 		try {
 			api::entrypoint::init();
 		} catch (const std::exception& e) {
-			logger.error("Failed to runStart: {}", e.what());
 			return ERR;
 		}
-		logger.trace("runStart finished");
 		return OK;
 	}
 
@@ -53,8 +49,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 }
 #elif defined(__linux__)
 int __attribute__((constructor)) ctor() {
-	std::cout << "Extendify: ctor" << std::endl;
-	const Status ret = runStart();
+	const Status ret = Extendify::runStart();
 	if (ret != OK) {
 		Extendify::logger.error("Failed to runStart");
 	}
@@ -62,7 +57,7 @@ int __attribute__((constructor)) ctor() {
 }
 
 int __attribute__((destructor)) dtor() {
-	const Status ret = runStop();
+	const Status ret = Extendify::runStop();
 	if (ret != OK) {
 		Extendify::logger.error("Failed to runStop");
 	}

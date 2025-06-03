@@ -127,6 +127,7 @@ namespace Extendify::util::string {
 		str = std::regex_replace(str, regex, replacement);
 	}
 
+#ifdef _WIN32
 	std::string wstringToString(std::wstring wstr) {
 		if (wstr.empty()) {
 			return "";
@@ -172,4 +173,5 @@ namespace Extendify::util::string {
 			ret << wc;
 		return ret.str();
 	}
+#endif
 } // namespace Extendify::util::string

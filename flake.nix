@@ -30,12 +30,12 @@
       {
         devShells.default =
           let
-            deps = with pkgs; [
-              curlWithGnuTls
-            ];
             inherit (pkgs) lib stdenv;
           in
           pkgs.mkShell {
+            packages = with pkgs; [
+              gtkmm4
+            ];
             LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [
               libgcc.lib
               nspr
