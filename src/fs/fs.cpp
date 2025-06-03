@@ -13,9 +13,12 @@
 #include <sstream>
 
 #ifdef _WIN32
+#include "log/log.hpp"
+
 #include <objbase.h>
 #include <processenv.h>
 #include <winerror.h>
+
 #endif
 
 namespace Extendify::fs {
