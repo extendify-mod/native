@@ -1,6 +1,6 @@
 #include "fs.hpp"
 
-#include "log/log.hpp"
+#include "util/TaskCBHandler.hpp"
 
 #include <cef_command_line.h>
 #include <cef_process_util.h>
@@ -10,11 +10,11 @@
 #include <fstream>
 #include <include/cef_task.h>
 #include <include/internal/cef_types.h>
-#include <objbase.h>
-#include <processenv.h>
 #include <sstream>
 
 #ifdef _WIN32
+#include <objbase.h>
+#include <processenv.h>
 #include <winerror.h>
 #endif
 
@@ -23,7 +23,8 @@ namespace Extendify::fs {
 
 	std::string readFile(const std::filesystem::path& path) {
 		if (!std::filesystem::exists(path)) {
-			logger.warn("Attempting to read a file that does not exist: {}", path.string());
+			logger.warn("Attempting to read a file that does not exist: {}",
+						path.string());
 			return "";
 		}
 
@@ -34,7 +35,8 @@ namespace Extendify::fs {
 		return ret.str();
 	}
 
-	void writeFile(const std::filesystem::path& path, const std::string& contents) {
+	void writeFile(const std::filesystem::path& path,
+				   const std::string& contents) {
 		std::ofstream fileStream(path);
 		if (!fileStream) {
 			logger.error("Failed to open file for writing: {}", path.string());
@@ -78,14 +80,17 @@ namespace Extendify::fs {
 			return std::find(exts.begin(), exts.end(), ext) != exts.end();
 		}
 
-		constexpr bool winHasExecutableExtension(const std::filesystem::path& file) {
-			return file.has_extension() && winIsExecutableExtension(file.extension().string());
+		constexpr bool
+		winHasExecutableExtension(const std::filesystem::path& file) {
+			return file.has_extension()
+				   && winIsExecutableExtension(file.extension().string());
 		}
 
 		constexpr std::string getShellExecuteError(INT_PTR err) {
 			switch (err) {
 				case 0:
-					return "The operating system is out of memory or resources.";
+					return "The operating system is out of memory or "
+						   "resources.";
 				// SE_ERR_FNF == ERROR_FILE_NOT_FOUND
 				// case SE_ERR_FNF:
 				case ERROR_FILE_NOT_FOUND:
@@ -95,27 +100,34 @@ namespace Extendify::fs {
 				case ERROR_PATH_NOT_FOUND:
 					return "The specified path was not found.";
 				case ERROR_BAD_FORMAT:
-					return "The .exe file is invalid (non-Win32 .exe or error in .exe image).";
+					return "The .exe file is invalid (non-Win32 .exe or error "
+						   "in .exe image).";
 				case SE_ERR_ACCESSDENIED:
-					return "The operating system denied access to the specified file.";
+					return "The operating system denied access to the "
+						   "specified file.";
 				case SE_ERR_ASSOCINCOMPLETE:
-					return "The file name association is incomplete or invalid.";
+					return "The file name association is incomplete or "
+						   "invalid.";
 				case SE_ERR_DDEBUSY:
-					return "The DDE transaction could not be completed because other DDE "
+					return "The DDE transaction could not be completed because "
+						   "other DDE "
 						   "transactions were being processed.";
 				case SE_ERR_DDEFAIL:
 					return "The DDE transaction failed.";
 				case SE_ERR_DDETIMEOUT:
-					return "The DDE transaction could not be completed because the request "
+					return "The DDE transaction could not be completed because "
+						   "the request "
 						   "timed out.";
 				case SE_ERR_DLLNOTFOUND:
 					return "The specified DLL was not found.";
 
 				case SE_ERR_NOASSOC:
-					return "There is no application associated with the given filename "
+					return "There is no application associated with the given "
+						   "filename "
 						   "extension.";
 				case SE_ERR_OOM:
-					return "There was not enough memory to complete the operation.";
+					return "There was not enough memory to complete the "
+						   "operation.";
 				case SE_ERR_SHARE:
 					return "A sharing violation occurred.";
 				default:
@@ -131,7 +143,8 @@ namespace Extendify::fs {
 		 */
 		void openPathWin(const std::filesystem::path& file) {
 			if (winHasExecutableExtension(file)) [[unlikely]] {
-				logger.warn("Attempting to open an executable file: {}", file.string());
+				logger.warn("Attempting to open an executable file: {}",
+							file.string());
 				return;
 			}
 			// https://github.com/microsoft/vscode-cpptools/issues/13644
@@ -139,14 +152,16 @@ namespace Extendify::fs {
 				SetEnvironmentVariableA("ELECTRON_RUN_AS_NODE", nullptr);
 			}
 			// https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shellexecutew#return-value
-			INT_PTR ret = (INT_PTR)ShellExecuteW(nullptr,
-												 nullptr,
-												 file.wstring().c_str(),
-												 nullptr,
-												 file.parent_path().wstring().c_str(),
-												 SW_SHOWNORMAL);
+			INT_PTR ret =
+				(INT_PTR)ShellExecuteW(nullptr,
+									   nullptr,
+									   file.wstring().c_str(),
+									   nullptr,
+									   file.parent_path().wstring().c_str(),
+									   SW_SHOWNORMAL);
 			if (ret <= 32) {
-				logger.error("ShellExecute failed: {}", getShellExecuteError(ret));
+				logger.error("ShellExecute failed: {}",
+							 getShellExecuteError(ret));
 			} else {
 				logger.debug("done");
 			}

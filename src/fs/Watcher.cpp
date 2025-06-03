@@ -4,20 +4,21 @@
 #include "log/Logger.hpp"
 
 #include <algorithm>
-#include <basetsd.h>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
-#include <ioapiset.h>
 #include <mutex>
 #include <stdexcept>
-#include <synchapi.h>
 #include <thread>
 #include <utility>
-#include <winnt.h>
-
 #ifdef _WIN32
 #include <windows.h>
+
+#include <basetsd.h>
+#include <ioapiset.h>
+#include <synchapi.h>
+#include <winnt.h>
+
 #endif
 
 using namespace Extendify;
@@ -89,8 +90,10 @@ Watcher::Watcher() {
 
 Watcher::~Watcher() {
 	shutdown = true;
+#ifdef _WIN32
 	PostQueuedCompletionStatus(onChange, 0, 0, nullptr);
 	SetEvent(hasEvents);
+#endif
 }
 
 int Watcher::addFile(const std::filesystem::path& path,

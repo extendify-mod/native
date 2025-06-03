@@ -1,7 +1,8 @@
 #pragma once
 #include <string>
-#include <optional>
 #include <vector>
+#include <optional>
+#include <cstdint>
 
 namespace Extendify::api::util {
 	struct APIFunction {

@@ -38,8 +38,9 @@ e_abort(const char* msg, const char* file, int line, const char* func) {
 #endif
 #endif
 /* This prints an "Assertion failed" message and aborts.  */
-extern void __assert_fail(const char* __assertion, const char* __file,
-						  unsigned int __line, const char* __function) __THROW
+extern "C" void __assert_fail(const char* __assertion, const char* __file,
+							  unsigned int __line,
+							  const char* __function) __THROW
 	__attribute__((__noreturn__));
 #endif
 #define E_ASSERT(expr)                                                  \
