@@ -1,13 +1,12 @@
 #include "jsInjection.hpp"
 
-#include "hook/hook.hpp"
 #include "api.hpp"
+#include "hook/hook.hpp"
 
 #include <capi/cef_v8_capi.h>
 #include <cef_callback.h> // needed because of error in cef_v8.h, must come before it
 #include <cef_v8.h>
 #include <include/internal/cef_string_wrappers.h>
-
 
 #define f_ret  cef_v8_value_t*
 #define f_args const cef_string_t *name, cef_v8_handler_t *handler
@@ -22,7 +21,9 @@ namespace Extendify::api::jsInjection {
 		CefStringUTF16 nameStr;
 		nameStr.FromString16(name->str, name->length);
 		if (nameStr == windowFuncName) {
-			logger.info("Found window context using function {}, injecting native API", nameStr.ToString());
+			logger.info(
+				"Found window context using function {}, injecting native API",
+				nameStr.ToString());
 			api::inject(CefV8Context::GetEnteredContext());
 		}
 		logger.debug("function name is {}", nameStr.ToString());
@@ -38,4 +39,4 @@ namespace Extendify::api::jsInjection {
 		logger.error("jsInjection::cleanup not implemented");
 	}
 
-}
+} // namespace Extendify::api::jsInjection

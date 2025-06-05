@@ -11,7 +11,6 @@
 #include <cef_base.h>
 #include <cef_v8.h>
 
-
 namespace Extendify::api::settings {
 	using util::APIFunction;
 	using util::APIUsage;

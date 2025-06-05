@@ -16,4 +16,4 @@ namespace Extendify::api::util::json {
 	CefRefPtr<CefV8Value> parse(const CefRefPtr<CefV8Value>& json);
 
 	std::string stringify(const CefRefPtr<CefV8Value>& obj);
-} // namespace Extendify::util::json
+} // namespace Extendify::api::util::json

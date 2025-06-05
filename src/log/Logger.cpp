@@ -25,7 +25,8 @@ Logger::Logger(const std::initializer_list<std::string>&& names):
 	addToAll();
 }
 
-Logger::Logger(const std::initializer_list<std::string>&& names, spdlog::sinks_init_list sinks):
+Logger::Logger(const std::initializer_list<std::string>&& names,
+			   spdlog::sinks_init_list sinks):
 	logger(makeFullLoggerName(names), sinks) {
 	set_level(defaultLevel);
 	addToAll();
@@ -52,15 +53,20 @@ void Logger::addSink(const std::shared_ptr<spdlog::sinks::sink>& sink) {
 	sinks().push_back(sink);
 }
 
-std::string Logger::makeFullLoggerName(const std::initializer_list<std::string>& names) {
+std::string
+Logger::makeFullLoggerName(const std::initializer_list<std::string>& names) {
 	return util::string::join(names, "/");
 }
 
 std::shared_ptr<spdlog::sinks::sink> Logger::getDefaultFileSink() {
-	// TODO: use event handlers to handle opening the file with more than one process
+	// TODO: use event handlers to handle opening the file with more than one
+	// process
 	static std::shared_ptr<spdlog::sinks::sink> sink =
 		std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-			(path::getLogDir() / "native.log").string(), 1048576 * 5, 1000, false);
+			(path::getLogDir() / "native.log").string(),
+			1048576 * 5,
+			1000,
+			false);
 
 	return sink;
 }
@@ -74,8 +80,10 @@ void Logger::setLevelForAll(spdlog::level::level_enum level) {
 }
 
 void Logger::addToAll() {
-	if (std::find(allLoggers.begin(), allLoggers.end(), this) != allLoggers.end()) {
-		throw std::runtime_error("Logger already in allLoggers, this should not happen");
+	if (std::find(allLoggers.begin(), allLoggers.end(), this)
+		!= allLoggers.end()) {
+		throw std::runtime_error(
+			"Logger already in allLoggers, this should not happen");
 	}
 	allLoggers.push_back(this);
 }

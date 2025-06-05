@@ -22,16 +22,17 @@ namespace Extendify::util::string {
 
 	struct SplitOptions {
 		int limit = -1;
-		std::regex_constants::match_flag_type flags = std::regex_constants::match_default;
+		std::regex_constants::match_flag_type flags =
+			std::regex_constants::match_default;
 	};
 
-	[[nodiscard]] std::vector<std::string> split(const std::string& str,
-												 const std::string& delimiter,
-												 const SplitOptions& opts = {}) noexcept;
+	[[nodiscard]] std::vector<std::string>
+	split(const std::string& str, const std::string& delimiter,
+		  const SplitOptions& opts = {}) noexcept;
 
-	[[nodiscard]] std::vector<std::string> split(const std::string& str,
-												 const std::basic_regex<char>& delimiter,
-												 const SplitOptions& opts = {});
+	[[nodiscard]] std::vector<std::string>
+	split(const std::string& str, const std::basic_regex<char>& delimiter,
+		  const SplitOptions& opts = {});
 
 	void trimr(std::string& str) noexcept;
 	void triml(std::string& str) noexcept;

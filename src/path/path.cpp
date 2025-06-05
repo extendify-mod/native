@@ -32,8 +32,10 @@ fs::path path::getBaseConfigDir(bool createIfNeeded) {
 		}
 		return ret.value();
 	}
-	logger.error("Error getting base path, both $HOME and $XDG_CONFIG_DIR are not set");
-	throw std::runtime_error("Error getting base path, both $HOME and $XDG_CONFIG_DIR are not set");
+	logger.error(
+		"Error getting base path, both $HOME and $XDG_CONFIG_DIR are not set");
+	throw std::runtime_error(
+		"Error getting base path, both $HOME and $XDG_CONFIG_DIR are not set");
 }
 
 fs::path path::getConfigFilePath() {
@@ -102,7 +104,8 @@ bool path::ensureFile(const std::filesystem::path& path) {
 	return ensureFile(path, "");
 }
 
-bool path::ensureFile(const std::filesystem::path& path, const std::string& defaultContent) {
+bool path::ensureFile(const std::filesystem::path& path,
+					  const std::string& defaultContent) {
 	if (fs::exists(path)) {
 		logger.debug("File {} already exists", path.string());
 		return false;

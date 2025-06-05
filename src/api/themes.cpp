@@ -611,7 +611,8 @@ namespace Extendify::api::themes {
 		return theme;
 	}
 
-	UserTheme getThemeInfo(const std::string& css, const std::string& fileName) {
+	UserTheme getThemeInfo(const std::string& css,
+						   const std::string& fileName) {
 		UserTheme theme;
 		theme.content = css;
 		if (theme.content.empty()) {

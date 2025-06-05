@@ -4,7 +4,6 @@
 
 #include <cef_v8.h>
 
-
 namespace Extendify::api::util {
 
 	class APIUsage {

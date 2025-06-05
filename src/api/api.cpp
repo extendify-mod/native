@@ -31,6 +31,4 @@ namespace Extendify::api {
 						 V8_PROPERTY_ATTRIBUTE_NONE);
 	}
 
-
-
 } // namespace Extendify::api

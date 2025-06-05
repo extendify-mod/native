@@ -1,8 +1,8 @@
 #pragma once
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
-#include <optional>
-#include <cstdint>
 
 namespace Extendify::api::util {
 	struct APIFunction {
@@ -21,4 +21,4 @@ namespace Extendify::api::util {
 		 */
 		std::optional<uint64_t> returnType;
 	};
-}
+} // namespace Extendify::api::util

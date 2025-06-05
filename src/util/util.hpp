@@ -54,7 +54,7 @@ namespace Extendify::util {
 	auto into = [](auto&&... values) {
 		return _into<T>::operator()(std::forward<decltype(values)>(values)...);
 	};
-	
+
 	// cursed that theres not a method on std::expected to do this
 	template<typename T, typename E>
 	auto mergeResult(std::expected<T, E> result) {

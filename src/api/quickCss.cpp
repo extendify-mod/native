@@ -1,14 +1,14 @@
 #include "quickCss.hpp"
 
-#include "util/CBHandler.hpp"
-#include "util/APIFunction.hpp"
-#include "util/APIUsage.hpp"
 #include "fs/fs.hpp"
 #include "fs/Watcher.hpp"
 #include "log/Logger.hpp"
 #include "path/path.hpp"
-#include "util/V8Type.hpp"
+#include "util/APIFunction.hpp"
+#include "util/APIUsage.hpp"
+#include "util/CBHandler.hpp"
 #include "util/TaskCBHandler.hpp"
+#include "util/V8Type.hpp"
 
 #include <cef_base.h>
 #include <cef_v8.h>
@@ -22,11 +22,11 @@ static CefRefPtr<CefV8Context> quickCssContext = nullptr;
 
 namespace Extendify::api::quickCss {
 	log::Logger logger({"Extendify", "api", "quickCss"});
+	using Extendify::util::TaskCBHandler;
 	using util::APIFunction;
 	using util::APIUsage;
-	using util::V8Type;
 	using util::CBHandler;
-	using Extendify::util::TaskCBHandler;
+	using util::V8Type;
 
 	namespace usage {
 		APIUsage get {APIFunction {
@@ -66,7 +66,8 @@ namespace Extendify::api::quickCss {
 			auto css = readQuickCssFile();
 			retval = CefV8Value::CreateString(css);
 		} catch (std::exception& e) {
-			const auto msg = std::format("Error reading quick CSS file: {}", e.what());
+			const auto msg =
+				std::format("Error reading quick CSS file: {}", e.what());
 			logger.error(msg);
 			exception = msg;
 		}
@@ -75,15 +76,18 @@ namespace Extendify::api::quickCss {
 
 	static auto setHandler = CBHandler::Create(
 		// NOLINTNEXTLINE(performance-unnecessary-value-param)
-		[](const CefString& name, CefRefPtr<CefV8Value> object, const CefV8ValueList& arguments,
-		   CefRefPtr<CefV8Value>& retval, CefString& exception) {
+		[](const CefString& name, CefRefPtr<CefV8Value> object,
+		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
+		   CefString& exception) {
 			try {
 				usage::set.validateOrThrow(arguments);
 				const auto content = arguments[0]->GetStringValue();
 				writeQuickCssFile(content);
-				// we dont need to dispatch an update here, as the file watcher will
+				// we dont need to dispatch an update here, as the file watcher
+				// will
 			} catch (std::exception& e) {
-				const auto msg = std::format("Error writing quick CSS file: {}", e.what());
+				const auto msg =
+					std::format("Error writing quick CSS file: {}", e.what());
 				logger.error(msg);
 				exception = msg;
 			}
@@ -92,25 +96,30 @@ namespace Extendify::api::quickCss {
 
 	static auto addChangeListenerHandler = CBHandler::Create(
 		// NOLINTNEXTLINE(performance-unnecessary-value-param)
-		[](const CefString& name, CefRefPtr<CefV8Value> object, const CefV8ValueList& arguments,
-		   CefRefPtr<CefV8Value>& retval, CefString& exception) {
+		[](const CefString& name, CefRefPtr<CefV8Value> object,
+		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
+		   CefString& exception) {
 			try {
 				usage::addChangeListener.validateOrThrow(arguments);
 				const auto currentContext = CefV8Context::GetCurrentContext();
 				if (!quickCssContext) {
 					quickCssContext = currentContext;
 				} else if (!quickCssContext->IsSame(currentContext)) {
-					logger.error("Saved quick css context is not the same as the entered one while "
-								 "adding a listener, invalidating all previous listeners and using "
+					logger.error("Saved quick css context is not the same as "
+								 "the entered one while "
+								 "adding a listener, invalidating all previous "
+								 "listeners and using "
 								 "the current context");
 					quickCssChangeListeners.clear();
 					quickCssContext = currentContext;
 				}
 				quickCssChangeListeners.push_back(arguments[0]);
-				logger.debug("Added quick css change listener, total listeners: {}",
-							 quickCssChangeListeners.size());
+				logger.debug(
+					"Added quick css change listener, total listeners: {}",
+					quickCssChangeListeners.size());
 			} catch (std::exception& e) {
-				const auto msg = std::format("Error adding change listener: {}", e.what());
+				const auto msg =
+					std::format("Error adding change listener: {}", e.what());
 				logger.error(msg);
 				exception = msg;
 			}
@@ -119,13 +128,15 @@ namespace Extendify::api::quickCss {
 
 	static auto openFileHandler = CBHandler::Create(
 		// NOLINTNEXTLINE(performance-unnecessary-value-param)
-		[](const CefString& name, CefRefPtr<CefV8Value> object, const CefV8ValueList& arguments,
-		   CefRefPtr<CefV8Value>& retval, CefString& exception) {
+		[](const CefString& name, CefRefPtr<CefV8Value> object,
+		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
+		   CefString& exception) {
 			try {
 				usage::openFile.validateOrThrow(arguments);
 				openQuickCssFile();
 			} catch (std::exception& e) {
-				const auto msg = std::format("Error opening file: {}", e.what());
+				const auto msg =
+					std::format("Error opening file: {}", e.what());
 				logger.error(msg);
 				exception = msg;
 			}
@@ -136,15 +147,20 @@ namespace Extendify::api::quickCss {
 	CefRefPtr<CefV8Value> makeApi() {
 		CefRefPtr<CefV8Value> api = CefV8Value::CreateObject(nullptr, nullptr);
 
-		CefRefPtr<CefV8Value> getFunc = CefV8Value::CreateFunction("get", getHandler);
+		CefRefPtr<CefV8Value> getFunc =
+			CefV8Value::CreateFunction("get", getHandler);
 		api->SetValue("get", getFunc, V8_PROPERTY_ATTRIBUTE_NONE);
 
-		CefRefPtr<CefV8Value> setFunc = CefV8Value::CreateFunction("set", setHandler);
+		CefRefPtr<CefV8Value> setFunc =
+			CefV8Value::CreateFunction("set", setHandler);
 		api->SetValue("set", setFunc, V8_PROPERTY_ATTRIBUTE_NONE);
 
 		CefRefPtr<CefV8Value> addChangeListenerFunc =
-			CefV8Value::CreateFunction("addChangeListener", addChangeListenerHandler);
-		api->SetValue("addChangeListener", addChangeListenerFunc, V8_PROPERTY_ATTRIBUTE_NONE);
+			CefV8Value::CreateFunction("addChangeListener",
+									   addChangeListenerHandler);
+		api->SetValue("addChangeListener",
+					  addChangeListenerFunc,
+					  V8_PROPERTY_ATTRIBUTE_NONE);
 
 		CefRefPtr<CefV8Value> openFileFunc =
 			CefV8Value::CreateFunction("openFile", openFileHandler);
@@ -157,8 +173,10 @@ namespace Extendify::api::quickCss {
 		static std::optional<int> watcherId = {};
 		if (!watcherId) {
 			watcherId = fs::Watcher::get()->addFile(
-				path::getQuickCssFile(), [](std::unique_ptr<fs::Watcher::Event> event) {
-					logger.debug("change in quick css file; dispatching update");
+				path::getQuickCssFile(),
+				[](std::unique_ptr<fs::Watcher::Event> event) {
+					logger.debug(
+						"change in quick css file; dispatching update");
 					dispatchQuickCssUpdate();
 				});
 		}
@@ -186,8 +204,8 @@ namespace Extendify::api::quickCss {
 		CefTaskRunner::GetForThread(CefThreadId::TID_RENDERER)
 			->PostTask(TaskCBHandler::Create([contents]() {
 				if (!quickCssContext) {
-					logger.warn(
-						"attempting to dispatch a quick css update before any listeners are setup");
+					logger.warn("attempting to dispatch a quick css update "
+								"before any listeners are setup");
 					return;
 				}
 				if (!quickCssContext->IsValid()) {
@@ -198,13 +216,15 @@ namespace Extendify::api::quickCss {
 					TaskCBHandler::Create([contents]() -> void {
 						for (const auto& cb : quickCssChangeListeners) {
 							if (!cb->IsFunction()) {
-								logger.warn(
-									"cb in quick css change listeners that is not a function, this "
-									"should never happen");
+								logger.warn("cb in quick css change listeners "
+											"that is not a function, this "
+											"should never happen");
 								continue;
 							}
 							cb->ExecuteFunctionWithContext(
-								quickCssContext, nullptr, {CefV8Value::CreateString(contents)});
+								quickCssContext,
+								nullptr,
+								{CefV8Value::CreateString(contents)});
 						}
 					}));
 			}));

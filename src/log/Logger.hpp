@@ -9,10 +9,11 @@
 
 namespace Extendify::log {
 	class Logger final: public spdlog::logger {
-	public:
+	  public:
 		Logger(const std::initializer_list<std::string>&& names);
 
-		Logger(const std::initializer_list<std::string>&& names, spdlog::sinks_init_list sinks);
+		Logger(const std::initializer_list<std::string>&& names,
+			   spdlog::sinks_init_list sinks);
 
 		~Logger() override;
 
@@ -21,22 +22,24 @@ namespace Extendify::log {
 		explicit Logger(logger&& other) noexcept;
 
 		void addSink(const std::shared_ptr<spdlog::sinks::sink>& sink);
-		
+
 		static void setLevelForAll(spdlog::level::level_enum level);
 
-	private:
-		static std::string makeFullLoggerName(const std::initializer_list<std::string>& names);
+	  private:
+		static std::string
+		makeFullLoggerName(const std::initializer_list<std::string>& names);
 
 		static std::shared_ptr<spdlog::sinks::sink> getDefaultFileSink();
-		
+
 		static std::vector<Logger*> allLoggers;
-		
-		static const spdlog::level::level_enum defaultLevel = spdlog::level::trace;
-		
+
+		static const spdlog::level::level_enum defaultLevel =
+			spdlog::level::trace;
+
 		void addToAll();
-		
+
 		void removeFromAll();
-		
+
 		std::vector<std::string> _names;
 	};
 

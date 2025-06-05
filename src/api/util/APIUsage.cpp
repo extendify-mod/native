@@ -5,7 +5,6 @@
 
 #include <format>
 
-
 namespace Extendify::api::util {
 	[[nodiscard]] APIUsage::APIUsage(APIFunction func):
 		func(std::move(func)) {

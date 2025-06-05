@@ -1,6 +1,7 @@
 #pragma once
 
 #include "main.hpp"
+
 #include <cef_base.h>
 #include <cef_thread.h>
 #include <cef_v8.h>
@@ -48,16 +49,16 @@ namespace Extendify::fs {
 
 		struct FilePickerData {
 			const DialogType mode = DialogType::OPEN;
-			const std::string title{};
+			const std::string title {};
 
 			/**
 			 * @brief folder path to open the dialog in
-			 * 
+			 *
 			 * @invariant must exist
 			 * @invariant must be a directory
 			 */
-			const std::filesystem::path defaultFolderPath{};
-			const std::vector<FileFilter> filters{};
+			const std::filesystem::path defaultFolderPath {};
+			const std::vector<FileFilter> filters {};
 			/**
 			 * @brief the default file filter
 			 *

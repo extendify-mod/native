@@ -37,7 +37,8 @@ long hook::hookFunction(void* orig, void* hookFunc) {
 	if (ret != NO_ERROR) {
 		switch (ret) {
 			case ERROR_NOT_ENOUGH_MEMORY:
-				msg = "ERROR_NOT_ENOUGH_MEMORY: Not enough memory is available to complete the operation.";
+				msg = "ERROR_NOT_ENOUGH_MEMORY: Not enough memory is available "
+					  "to complete the operation.";
 				goto err;
 			default:
 				msg = "Unknown error: " + std::to_string(ret);
@@ -48,16 +49,19 @@ long hook::hookFunction(void* orig, void* hookFunc) {
 	if (ret != NO_ERROR) {
 		switch (ret) {
 			case ERROR_INVALID_BLOCK:
-				msg = "ERROR_INVALID_BLOCK: The specified function is too small to be hooked.";
+				msg = "ERROR_INVALID_BLOCK: The specified function is too "
+					  "small to be hooked.";
 				goto err;
 			case ERROR_INVALID_HANDLE:
-				msg = "ERROR_INVALID_HANDLE: The original function is null or points to a null pointer.";
+				msg = "ERROR_INVALID_HANDLE: The original function is null or "
+					  "points to a null pointer.";
 				goto err;
 			case ERROR_INVALID_OPERATION:
 				msg = "ERROR_INVALID_OPERATION: No pending transaction exists.";
 				goto err;
 			case ERROR_NOT_ENOUGH_MEMORY:
-				msg = "ERROR_NOT_ENOUGH_MEMORY: Not enough memory is available to complete the operation.";
+				msg = "ERROR_NOT_ENOUGH_MEMORY: Not enough memory is available "
+					  "to complete the operation.";
 				goto err;
 			default:
 				msg = "Unknown error: " + std::to_string(ret);
@@ -71,8 +75,8 @@ long hook::hookFunction(void* orig, void* hookFunc) {
 				msg = "ERROR_INVALID_OPERATION: No pending transaction exists.";
 				goto err;
 			case ERROR_INVALID_DATA:
-				msg =
-					"ERROR_INVALID_DATA: Target function was changed by third party bewteen steps of the transaction.";
+				msg = "ERROR_INVALID_DATA: Target function was changed by "
+					  "third party bewteen steps of the transaction.";
 				goto err;
 			default:
 				msg = "Unknown error: " + std::to_string(ret);
@@ -93,7 +97,7 @@ err:
 }
 
 long hook::unhookFunction(void* orig, void* hookFunc) {
-	#warning TODO
+#warning TODO
 	throw std::runtime_error("Unhooking function is not implemented");
 }
 
@@ -105,7 +109,9 @@ long hook::unhookFunction(void* orig, void* hookFunc) {
 
 namespace Extendify::hook {
 	long hookFunction(void* orig, void* hookFunc) {
-		if (const long ret = DobbyHook(*static_cast<void**>(orig), hookFunc, static_cast<void**>(orig))) {
+		if (const long ret = DobbyHook(*static_cast<void**>(orig),
+									   hookFunc,
+									   static_cast<void**>(orig))) {
 			logger.error("Failed to hook function {}", orig);
 			return ret;
 		}

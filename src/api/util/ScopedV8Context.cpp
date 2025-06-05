@@ -4,7 +4,6 @@
 
 #include <cef_v8.h>
 
-
 namespace Extendify::api::util {
 	ScopedV8Context::ScopedV8Context(CefRefPtr<CefV8Context> _context):
 		id(nextId++),

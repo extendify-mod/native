@@ -3,7 +3,6 @@
 #include <utility>
 #include <vector>
 
-
 namespace Extendify::util::iter {
 	template<typename Orig, typename F>
 

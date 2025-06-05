@@ -33,9 +33,11 @@ namespace Extendify::api::themes {
 		std::string fileName;
 		std::string name;
 		std::string content;
-		std::string author = "Unknown Author"; // Default to Unknown Author if not specified
+		std::string author =
+			"Unknown Author"; // Default to Unknown Author if not specified
 		std::string description =
-			"An Extendify Theme"; // Default to An Extendify Theme if not specified
+			"An Extendify Theme"; // Default to An Extendify Theme if not
+								  // specified
 		std::optional<std::string> version;
 		std::optional<std::string> license;
 		std::optional<std::string> source;
@@ -50,5 +52,6 @@ namespace Extendify::api::themes {
 		UserTheme& operator=(UserTheme&&) noexcept = default;
 	};
 
-	[[nodiscard]] UserTheme getThemeInfo(const std::string& css, const std::string& fileName);
+	[[nodiscard]] UserTheme getThemeInfo(const std::string& css,
+										 const std::string& fileName);
 } // namespace Extendify::api::themes

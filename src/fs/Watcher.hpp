@@ -117,7 +117,9 @@ namespace Extendify::fs {
 		std::unordered_map<std::filesystem::path, std::unique_ptr<Dir>> dirs;
 
 		std::mutex pendingEventsMutex;
-		std::deque<std::tuple<std::filesystem::path, Reason, std::filesystem::path>> pendingEvents;
+		std::deque<
+			std::tuple<std::filesystem::path, Reason, std::filesystem::path>>
+			pendingEvents;
 
 		void processEvents();
 		/**

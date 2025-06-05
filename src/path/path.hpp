@@ -34,8 +34,10 @@ namespace Extendify::path {
 	/**
 	 * @brief Creates `path` if it does not exist
 	 * @param path the path of the file to create
-	 * @param defaultContent The default content to create the file with if it doesn't exist
+	 * @param defaultContent The default content to create the file with if it
+	 * doesn't exist
 	 * @return true if the file was created, false otherwise
 	 */
-	bool ensureFile(const std::filesystem::path& path, const std::string& defaultContent);
-}
+	bool ensureFile(const std::filesystem::path& path,
+					const std::string& defaultContent);
+} // namespace Extendify::path
