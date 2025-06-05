@@ -11,14 +11,14 @@
 namespace Extendify::api::util {
 	class CBHandler final: public CefV8Handler {
 	  public:
-		typedef std::function<bool(CB_HANDLER_ARGS)> Callback;
+		using Callback = std::function<bool(CB_HANDLER_ARGS)>;
 
-		static CefRefPtr<CBHandler> Create(Callback h);
+		static CefRefPtr<CBHandler> Create(Callback callback);
 
 		bool Execute(CB_HANDLER_ARGS) override;
 
 	  private:
-		void setCallback(Callback h);
+		void setCallback(Callback callback);
 		Callback handler;
 		IMPLEMENT_REFCOUNTING(CBHandler);
 	};

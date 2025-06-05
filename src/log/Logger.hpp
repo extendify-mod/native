@@ -1,11 +1,9 @@
 #pragma once
 
-#include <functional>
 #include <initializer_list>
 #include <spdlog/common.h>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/sink.h>
-#include <unordered_set>
 
 namespace Extendify::log {
 	class Logger final: public spdlog::logger {
@@ -17,9 +15,11 @@ namespace Extendify::log {
 
 		~Logger() override;
 
-		Logger(const Logger& other);
+		Logger(const Logger& other) = delete;
+		Logger& operator=(const Logger&) = default;
 
-		explicit Logger(logger&& other) noexcept;
+		Logger(Logger&&) = delete;
+		Logger& operator=(Logger&&) = delete;
 
 		void addSink(const std::shared_ptr<spdlog::sinks::sink>& sink);
 

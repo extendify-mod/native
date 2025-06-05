@@ -22,6 +22,7 @@ fs::path path::getBaseConfigDir(bool createIfNeeded) {
 		ret = fs::path(homePath) / ".config" / "extendify";
 	}
 #elifdef _WIN32
+	// NOLINTNEXTLINE(concurrency-mt-unsafe)
 	if (const auto appData = std::getenv("APPDATA")) {
 		ret = fs::path(appData) / "extendify";
 	}

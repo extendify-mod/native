@@ -12,6 +12,8 @@ namespace Extendify::api::util {
 		~ScopedV8Context();
 
 		ScopedV8Context() = delete;
+		ScopedV8Context& operator=(const ScopedV8Context&) = delete;
+		ScopedV8Context& operator=(ScopedV8Context&&) = delete;
 		ScopedV8Context(const ScopedV8Context& other) = delete;
 		ScopedV8Context(ScopedV8Context&& other) = delete;
 

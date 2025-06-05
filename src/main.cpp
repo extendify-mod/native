@@ -8,32 +8,27 @@
 #include <windows.h>
 #endif
 
-enum Status {
-	NOT_STARTED,
-	OK,
-	ERR
-};
-
 namespace Extendify {
 	log::Logger logger({"Extendify"});
 
-	Status runStart() {
+	InitStatus runStart() {
 		try {
 			api::entrypoint::init();
 		} catch (const std::exception& e) {
-			return ERR;
+			return InitStatus::ERR;
 		}
-		return OK;
+		return InitStatus::OK;
 	}
 
-	Status runStop() {
-		return OK;
+	InitStatus runStop() {
+		return InitStatus::OK;
 	}
 } // namespace Extendify
 
 #if defined(_WIN32)
-BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
-	Status ret = Status::NOT_STARTED;
+// NOLINTNEXTLINE(misc-use-internal-linkage)
+BOOL WINAPI DllMain(HINSTANCE  /*hinstDLL*/, DWORD fdwReason, LPVOID  /*lpvReserved*/) {
+	Extendify::InitStatus ret = Extendify::InitStatus::NOT_STARTED;
 	switch (fdwReason) {
 		case DLL_PROCESS_ATTACH:
 			ret = Extendify::runStart();

@@ -52,6 +52,7 @@ target_compile_options(extendify PRIVATE -Wall -Wextra -Wpedantic)
 # ingore annoying warnings
 target_compile_options(extendify PRIVATE -Wno-unused-parameter)
 target_compile_options(extendify PRIVATE -Wno-sign-compare)
+target_compile_options(extendify PRIVATE -Wno-missing-designated-field-initializers)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
 elseif(SUPPORTS_GDWARF)

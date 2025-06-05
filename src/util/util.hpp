@@ -20,7 +20,8 @@ namespace Extendify::util {
 		const auto typeFlag = cmdline->GetSwitchValue("type");
 		if (typeFlag.empty()) {
 			return processId == PID_BROWSER;
-		} else if (typeFlag == "renderer") {
+		}
+		if (typeFlag == "renderer") {
 			return processId == PID_RENDERER;
 		}
 		return false;
@@ -51,7 +52,7 @@ namespace Extendify::util {
 	} // namespace
 
 	template<typename T>
-	auto into = [](auto&&... values) {
+	const auto into = [](auto&&... values) {
 		return _into<T>::operator()(std::forward<decltype(values)>(values)...);
 	};
 

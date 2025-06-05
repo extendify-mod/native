@@ -14,11 +14,11 @@ namespace Extendify::api::util {
 		 * @brief array of parameter types, bitwise OR'd together
 		 * @see V8Type
 		 */
-		const std::vector<uint64_t> expectedArgs;
+		std::vector<uint16_t> expectedArgs;
 		/**
 		 * @brief  return type, bitwise OR'd together
 		 * @see V8Type
 		 */
-		std::optional<uint64_t> returnType;
+		std::optional<uint16_t> returnType;
 	};
 } // namespace Extendify::api::util

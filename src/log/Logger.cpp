@@ -32,16 +32,6 @@ Logger::Logger(const std::initializer_list<std::string>&& names,
 	addToAll();
 }
 
-Logger::Logger(const Logger& other):
-	logger(other) {
-	addToAll();
-}
-
-Logger::Logger(logger&& other) noexcept:
-	logger(other) {
-	addToAll();
-}
-
 Logger::~Logger() {
 	// remove from allLoggers
 	removeFromAll();
@@ -80,8 +70,7 @@ void Logger::setLevelForAll(spdlog::level::level_enum level) {
 }
 
 void Logger::addToAll() {
-	if (std::find(allLoggers.begin(), allLoggers.end(), this)
-		!= allLoggers.end()) {
+	if (std::ranges::find(allLoggers, this) != allLoggers.end()) {
 		throw std::runtime_error(
 			"Logger already in allLoggers, this should not happen");
 	}
@@ -89,7 +78,7 @@ void Logger::addToAll() {
 }
 
 void Logger::removeFromAll() {
-	const auto pos = std::find(allLoggers.begin(), allLoggers.end(), this);
+	const auto pos = std::ranges::find(allLoggers, this);
 	if (pos != allLoggers.end()) {
 		allLoggers.erase(pos);
 	}

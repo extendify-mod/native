@@ -18,21 +18,21 @@ namespace Extendify::api::settings {
 	using util::V8Type;
 
 	namespace usage {
-		APIUsage get {APIFunction {
+		const APIUsage get {APIFunction {
 			.name = "get",
 			.description = "Get the settings object",
 			.path = "settings",
 			.expectedArgs = {},
 			.returnType = V8Type::OBJECT,
 		}};
-		APIUsage set {APIFunction {
+		const APIUsage set {APIFunction {
 			.name = "set",
 			.description = "Set the settings object",
 			.path = "settings",
 			.expectedArgs = {V8Type::OBJECT},
 			.returnType = V8Type::UNDEFINED,
 		}};
-		APIUsage getSettingsDir {APIFunction {
+		const APIUsage getSettingsDir {APIFunction {
 			.name = "getSettingsDir",
 			.description = "Get the settings directory",
 			.path = "settings",
@@ -43,48 +43,60 @@ namespace Extendify::api::settings {
 
 	log::Logger logger({"Extendify", "api", "settings"});
 
-	// NOLINTNEXTLINE(performance-unnecessary-value-param)
-	static auto getHandler = CBHandler::Create([](CB_HANDLER_ARGS) {
-		try {
-			usage::get.validateOrThrow(arguments);
-			const auto settingsString = readSettingsFile();
-			auto settingsObject = parseSettings(settingsString);
-			retval = settingsObject;
-		} catch (const std::exception& e) {
-			settings::logger.error("Error in getSettings: {}", e.what());
-			exception = e.what();
-		}
-		return true;
-	});
+	static auto getHandler = CBHandler::Create(
+		// NOLINTNEXTLINE(performance-unnecessary-value-param)
+		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
+		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
+		   CefString& exception) {
+			try {
+				usage::get.validateOrThrow(arguments);
+				const auto settingsString = readSettingsFile();
+				auto settingsObject = parseSettings(settingsString);
+				retval = settingsObject;
+			} catch (const std::exception& e) {
+				settings::logger.error("Error in getSettings: {}", e.what());
+				exception = e.what();
+			}
+			return true;
+		});
 
 	// NOLINTNEXTLINE(performance-unnecessary-value-param)
-	static auto setHandler = CBHandler::Create([](CB_HANDLER_ARGS) {
-		try {
-			usage::set.validateOrThrow(arguments);
-			const auto& obj = arguments[0];
-			const auto settingsString = util::json::stringify(obj);
-			writeSettingsFile(settingsString);
+	static auto setHandler = CBHandler::Create(
+		// NOLINTNEXTLINE(performance-unnecessary-value-param)
+		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
+		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& /*retval*/,
+		   CefString& exception) {
+			try {
+				usage::set.validateOrThrow(arguments);
+				const auto& obj = arguments[0];
+				const auto settingsString = util::json::stringify(obj);
+				writeSettingsFile(settingsString);
 
-		} catch (const std::exception& e) {
-			settings::logger.error("Error in setSettings: {}", e.what());
-			exception = e.what();
-		}
-		return true;
-	});
+			} catch (const std::exception& e) {
+				settings::logger.error("Error in setSettings: {}", e.what());
+				exception = e.what();
+			}
+			return true;
+		});
 
-	// NOLINTNEXTLINE(performance-unnecessary-value-param)
-	static auto getSettingsDirHandler = CBHandler::Create([](CB_HANDLER_ARGS) {
-		try {
-			usage::getSettingsDir.validateOrThrow(arguments);
-			const auto settingsPath = path::getConfigFilePath().parent_path();
-			const auto ret = CefV8Value::CreateString(settingsPath.string());
-			retval = ret;
-		} catch (const std::exception& e) {
-			settings::logger.error("Error in getSettingsDir: {}", e.what());
-			exception = e.what();
-		}
-		return true;
-	});
+	static auto getSettingsDirHandler = CBHandler::Create(
+		// NOLINTNEXTLINE(performance-unnecessary-value-param)
+		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
+		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
+		   CefString& exception) {
+			try {
+				usage::getSettingsDir.validateOrThrow(arguments);
+				const auto settingsPath =
+					path::getConfigFilePath().parent_path();
+				const auto ret =
+					CefV8Value::CreateString(settingsPath.string());
+				retval = ret;
+			} catch (const std::exception& e) {
+				settings::logger.error("Error in getSettingsDir: {}", e.what());
+				exception = e.what();
+			}
+			return true;
+		});
 
 	CefRefPtr<CefV8Value> makeApi() {
 		CefRefPtr<CefV8Value> api = CefV8Value::CreateObject(nullptr, nullptr);

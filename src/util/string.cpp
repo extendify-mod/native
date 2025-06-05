@@ -24,23 +24,21 @@ namespace Extendify::util::string {
 		std::vector<std::string> res;
 		int curCount = 0;
 		if (delimiter.empty()) {
-			for (const auto& c : str) {
+			for (const auto& curChar : str) {
 				if (curCount++ == opts.limit) {
 					break;
 				}
-				res.emplace_back(1, c);
+				res.emplace_back(1, curChar);
 			}
 			return res;
 		}
-		auto lastPos = 0uz;
+		auto lastPos = 0UZ;
 		auto nextPos = str.find(delimiter, lastPos);
 		while (curCount++ != opts.limit) {
 			if (nextPos == std::string::npos) {
 				nextPos = str.size();
-				// NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
 				res.emplace_back(str.begin() + lastPos, str.begin() + nextPos);
 			}
-			// NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
 			res.emplace_back(str.begin() + lastPos, str.begin() + nextPos);
 			lastPos = nextPos + delimiter.size();
 			nextPos = str.find(delimiter, lastPos);
@@ -135,24 +133,23 @@ namespace Extendify::util::string {
 		// reset state
 		std::wctomb(nullptr, *wstr.begin());
 		const auto maxSize = MB_CUR_MAX;
-		auto buf = new char[MB_CUR_MAX];
+		std::unique_ptr<char[]> buf(new char[maxSize]);
 		std::stringstream ret;
-		for (const wchar_t wc : wstr) {
+		for (const wchar_t curChar : wstr) {
 			// null chars can be in strings and not terminate them
-			if (wc == L'\0') {
+			if (curChar == L'\0') {
 				ret << '\0';
 				continue;
 			}
-			int count = std::wctomb(buf, wc);
+			int count = std::wctomb(buf.get(), curChar);
 			E_ASSERT(count <= maxSize && "wctomb returned more than max size");
 			// https://en.wikipedia.org/wiki/Specials_(Unicode_block)
 			if (count < 0) {
 				ret << "\uFFFD"; // replacement character
 				continue;
 			}
-			ret.write(buf, count);
+			ret.write(buf.get(), count);
 		}
-		delete[] buf;
 		return ret.str();
 	}
 
@@ -167,10 +164,11 @@ namespace Extendify::util::string {
 		auto end = str.end();
 		std::wstringstream ret;
 		int count {};
-		for (wchar_t wc;
+		for (wchar_t wc {};
 			 (count = std::mbtowc(&wc, begin._Ptr, end - begin)) > 0;
-			 begin += count)
+			 begin += count) {
 			ret << wc;
+		}
 		return ret.str();
 	}
 #endif

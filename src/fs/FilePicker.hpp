@@ -5,9 +5,11 @@
 #include <cef_base.h>
 #include <cef_thread.h>
 #include <cef_v8.h>
+#include <cstdint>
 #include <expected>
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <variant>
 
 namespace Extendify::fs {
@@ -15,9 +17,9 @@ namespace Extendify::fs {
 	 * YOU ARE RESPONSIBLE FOR MAKING SURE THAT THIS LIVES LONGER THAN THE
 	 * PROMISE
 	 */
-	class FilePicker: public CefBaseRefCounted {
+	class FilePicker {
 	  public:
-		enum class DialogType {
+		enum class DialogType : uint8_t {
 			OPEN,
 			OPEN_MANY,
 			OPEN_FOLDER,
@@ -27,14 +29,13 @@ namespace Extendify::fs {
 		// launched from, the second the result if the array is empty,
 		// somethoing went wrong or the user cancelled the dialog
 		// If an error occurs, the third argument will contain an error message
-		typedef std::function<std::expected<CefRefPtr<CefV8Value>, std::string>(
-			CefRefPtr<FilePicker>, std::vector<std::filesystem::path>,
-			std::optional<std::string>)>
-			PromiseCallback;
-		typedef std::function<void(CefRefPtr<FilePicker>,
-								   std::vector<std::filesystem::path>,
-								   std::optional<std::string>)>
-			Callback;
+		using PromiseCallback =
+			std::function<std::expected<CefRefPtr<CefV8Value>, std::string>(
+				std::shared_ptr<FilePicker>, std::vector<std::filesystem::path>,
+				std::optional<std::string>)>;
+		using Callback = std::function<void(std::shared_ptr<FilePicker>,
+											std::vector<std::filesystem::path>,
+											std::optional<std::string>)>;
 
 		struct FileFilter {
 			std::string displayName;
@@ -48,8 +49,8 @@ namespace Extendify::fs {
 		};
 
 		struct FilePickerData {
-			const DialogType mode = DialogType::OPEN;
-			const std::string title {};
+			DialogType mode = DialogType::OPEN;
+			std::string title;
 
 			/**
 			 * @brief folder path to open the dialog in
@@ -57,21 +58,24 @@ namespace Extendify::fs {
 			 * @invariant must exist
 			 * @invariant must be a directory
 			 */
-			const std::filesystem::path defaultFolderPath {};
-			const std::vector<FileFilter> filters {};
+			std::filesystem::path defaultFolderPath;
+			std::vector<FileFilter> filters;
 			/**
 			 * @brief the default file filter
 			 *
 			 * SHOULD NOT BE IN @link filters
 			 */
-			const FileFilter defaultFilter = {.displayName = "All Files",
-											  .patterns = {"*.*"}};
-			const ids::ExtendifyId& stateId = ids::DEFAULT;
+			FileFilter defaultFilter = {.displayName = "All Files",
+										.patterns = {"*.*"}};
+			ids::ExtendifyId* stateId = &ids::DEFAULT;
 		};
 
 		FilePicker() = delete;
 
-		[[nodiscard]] static CefRefPtr<FilePicker> Create(FilePickerData data);
+		[[nodiscard]] explicit FilePicker(FilePickerData data);
+
+		[[nodiscard]] static std::shared_ptr<FilePicker>
+		Create(FilePickerData data);
 
 		/**
 		 * @brief runs the file picker dialog
@@ -84,15 +88,16 @@ namespace Extendify::fs {
 		 * @return CefRefPtr<CefV8Value>
 		 */
 		[[nodiscard]] CefRefPtr<CefV8Value>
-		promise(CefRefPtr<CefV8Context> context, PromiseCallback callback);
+		promise(const CefRefPtr<CefV8Context>& context,
+				PromiseCallback callback);
 
 		void launch(Callback callback);
 		// utility functions that just use the default values
 
-		[[nodiscard]] static CefRefPtr<FilePicker> pickOne();
-		[[nodiscard]] static CefRefPtr<FilePicker> pickMany();
-		[[nodiscard]] static CefRefPtr<FilePicker> pickFolder();
-		[[nodiscard]] static CefRefPtr<FilePicker> pickSaveFile();
+		[[nodiscard]] static std::shared_ptr<FilePicker> pickOne();
+		[[nodiscard]] static std::shared_ptr<FilePicker> pickMany();
+		[[nodiscard]] static std::shared_ptr<FilePicker> pickFolder();
+		[[nodiscard]] static std::shared_ptr<FilePicker> pickSaveFile();
 
 		// thread-safe
 		[[nodiscard]] constexpr bool isRunning() const {
@@ -102,8 +107,6 @@ namespace Extendify::fs {
 	  private:
 		// we can't run more than one per instance, at a time
 		std::atomic_bool running = false;
-		// ctor
-		[[nodiscard]] explicit FilePicker(FilePickerData data);
 		// static
 		static int nextId;
 		// config
@@ -124,12 +127,11 @@ namespace Extendify::fs {
 		std::variant<V8Data, RawData> callbackData;
 		CefRefPtr<CefThread> pickerThread;
 
-		CefRefPtr<FilePicker> self;
+		std::shared_ptr<FilePicker> self;
 
 		void runFilePicker();
 		[[nodiscard]] std::expected<std::vector<std::filesystem::path>,
 									std::string>
 		showDialog() const;
-		IMPLEMENT_REFCOUNTING(FilePicker);
 	};
 } // namespace Extendify::fs

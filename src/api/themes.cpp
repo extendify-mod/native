@@ -21,164 +21,30 @@
 #include <regex>
 #include <shared_mutex>
 
-static CefV8ValueList themeChangeListeners {};
-static CefRefPtr<CefV8Context> themeChangeContext = nullptr;
-
-using namespace Extendify::util;
-
 namespace Extendify::api::themes {
+	namespace {
+		CefV8ValueList themeChangeListeners {};
+		CefRefPtr<CefV8Context> themeChangeContext = nullptr;
+		ThemeCache themeCache;
+	} // namespace
+
 	log::Logger logger({"Extendify", "api", "themes"});
 
 	using util::APIFunction;
 	using util::APIUsage;
 	using util::CBHandler;
 	using util::V8Type;
-
-	class ThemeCache {
-	  public:
-		ThemeCache() = default;
-		ThemeCache(const ThemeCache&) = delete;
-		ThemeCache& operator=(const ThemeCache&) = delete;
-		ThemeCache(ThemeCache&&) noexcept = delete;
-		ThemeCache& operator=(ThemeCache&&) = delete;
-
-		void initThemes() {
-			const auto themesDir = path::getThemesDir();
-			if (!std::filesystem::exists(themesDir)) {
-				logger.info(
-					"Themes directory does not exist, no themes to load");
-				return;
-			}
-			const std::scoped_lock lock(themesMutex);
-			const auto iter =
-				std::filesystem::recursive_directory_iterator(themesDir);
-			const auto beforeSize = themes.size();
-			for (const auto& entry : iter) {
-				std::error_code ec;
-				if (entry.is_regular_file(ec)) {
-					const auto content = fs::readFile(entry.path());
-					themes.insert(std::make_shared<UserTheme>(getThemeInfo(
-						content,
-						entry.path().lexically_relative(themesDir).string())));
-					logger.debug("loaded theme: {}", entry.path().string());
-				} else if (entry.is_directory(ec)) {
-					logger.trace("recursing into directory: {}",
-								 entry.path().string());
-				}
-				if (ec) {
-					logger.warn("error iterating over path {}. msg: {}",
-								entry.path().string(),
-								ec.message());
-				}
-			}
-			const auto afterSize = themes.size();
-			logger.info("Loaded {} themes from {}",
-						afterSize - beforeSize,
-						themesDir.string());
-			logger.trace("exiting theme loading thread");
-		}
-
-		[[nodiscard]] std::optional<std::shared_ptr<UserTheme>>
-		getFromName(const std::string& name) const {
-			const std::shared_lock lock(themesMutex);
-			const auto pos = std::ranges::find(themes, name, &UserTheme::name);
-			if (pos != themes.end()) {
-				return *pos;
-			}
-			return {};
-		};
-
-		[[nodiscard]] std::optional<std::shared_ptr<UserTheme>>
-		getFromFileName(const std::string& fileName) const {
-			const std::shared_lock lock(themesMutex);
-			const auto pos =
-				std::ranges::find(themes, fileName, &UserTheme::fileName);
-			if (pos != themes.end()) {
-				return *pos;
-			}
-			return {};
-		};
-
-		void dispatchThemeUpdate(const std::string& themeName) {
-			const auto theme = getFromName(themeName);
-			if (!theme) {
-				logger.warn("Attempting to dispatch theme update for a theme "
-							"that does not exist: {}",
-							themeName);
-				return;
-			} else {
-				dispatchThemeUpdate(path::getThemesDir() / (*theme)->fileName);
-			}
-		}
-
-		void dispatchThemeUpdate(const std::filesystem::path& path) {
-			const auto relativePath =
-				path.lexically_relative(path::getThemesDir()).string();
-			auto theme = getFromFileName(relativePath);
-			std::scoped_lock lock(themesMutex);
-
-			if (theme) {
-				themes.erase(*theme);
-			}
-			if (!std::filesystem::exists(path)
-				|| std::filesystem::is_directory(path)) {
-				return;
-			}
-
-			const auto content = fs::readFile(path);
-			themes.emplace(std::make_shared<UserTheme>(
-				getThemeInfo(content, relativePath)));
-			CefTaskRunner::GetForThread(CefThreadId::TID_RENDERER)
-				->PostTask(TaskCBHandler::Create([relativePath]() {
-					if (!themeChangeContext) {
-						logger.warn("attempting to dispatch a quick css update "
-									"before any listeners are setup");
-						return;
-					}
-					if (!themeChangeContext->IsValid()) {
-						logger.error("quick css context is not valid");
-						return;
-					}
-					themeChangeContext->GetTaskRunner()->PostTask(
-						TaskCBHandler::Create([relativePath]() -> void {
-							for (const auto& cb : themeChangeListeners) {
-								if (!cb->IsFunction()) {
-									logger.warn(
-										"cb in theme change listeners that "
-										"is not a function, this "
-										"should never happen");
-									continue;
-								}
-								cb->ExecuteFunctionWithContext(
-									themeChangeContext,
-									nullptr,
-									{CefV8Value::CreateString(relativePath)});
-							}
-						}));
-				}));
-		}
-
-		[[nodiscard]] std::vector<std::shared_ptr<UserTheme>>
-		getThemes() const {
-			return {themes.begin(), themes.end()};
-		}
-
-	  private:
-		mutable std::shared_mutex themesMutex;
-		std::unordered_set<std::shared_ptr<UserTheme>> themes;
-	};
-
-	static ThemeCache themeCache;
+	using namespace Extendify::util;
 
 	namespace usage {
 
-		APIUsage uploadTheme {APIFunction {
+		const APIUsage uploadTheme {APIFunction {
 			.name = "uploadTheme",
 			.description = "Prompts the user to upload a theme file",
 			.path = "themes",
 			.expectedArgs = {},
 			.returnType = V8Type::PROMISE}};
-		APIUsage deleteTheme {APIFunction {
+		const APIUsage deleteTheme {APIFunction {
 			.name = "deleteTheme",
 			.description =
 				"Delete a theme by its file. The string should be the path to "
@@ -188,7 +54,7 @@ namespace Extendify::api::themes {
 			.expectedArgs = {V8Type::STRING},
 			.returnType = V8Type::PROMISE,
 		}};
-		APIUsage addChangeListener {APIFunction {
+		const APIUsage addChangeListener {APIFunction {
 			.name = "addThemeChangeListener",
 			.description = "Add a listener for theme changes (files added or "
 						   "removed from the theme folder)",
@@ -196,7 +62,7 @@ namespace Extendify::api::themes {
 			.expectedArgs = {V8Type::FUNCTION},
 			.returnType = V8Type::UNDEFINED,
 		}};
-		APIUsage getThemesDir {APIFunction {
+		const APIUsage getThemesDir {APIFunction {
 			.name = "getThemesDir",
 			.description = "Get the path to the themes directory",
 			.path = "themes",
@@ -208,14 +74,14 @@ namespace Extendify::api::themes {
 		 *
 		 * @returns array of UserTheme
 		 */
-		APIUsage getThemes {APIFunction {
+		const APIUsage getThemes {APIFunction {
 			.name = "getThemes",
 			.description = "Get the list of themes in the themes directory",
 			.path = "themes",
 			.expectedArgs = {},
 			.returnType = V8Type::ARRAY,
 		}};
-		APIUsage getThemeData {APIFunction {
+		const APIUsage getThemeData {APIFunction {
 			.name = "getThemeData",
 			.description = "Get the data for a theme by its filename",
 			.path = "themes",
@@ -225,7 +91,7 @@ namespace Extendify::api::themes {
 
 	static auto uploadThemeHandler = CBHandler::Create(
 		// NOLINTNEXTLINE(performance-unnecessary-value-param)
-		[](const CefString& name, CefRefPtr<CefV8Value> object,
+		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
 		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
 		   CefString& exception) {
 			try {
@@ -242,10 +108,11 @@ namespace Extendify::api::themes {
 							 .displayName = "CSS Files",
 							 .patterns = {"*.css", "*.theme.css"},
 						 },
-					 .stateId = ids::THEMES});
+					 .stateId = &ids::THEMES});
 				retval = picker->promise(
 					CefV8Context::GetCurrentContext(),
-					[](CefRefPtr<fs::FilePicker> picker,
+					// NOLINTNEXTLINE(performance-unnecessary-value-param)
+					[](std::shared_ptr<fs::FilePicker> /*picker*/,
 					   std::vector<std::filesystem::path>
 						   pickedPath,
 					   std::optional<std::string>
@@ -283,7 +150,8 @@ namespace Extendify::api::themes {
 		});
 
 	static auto deleteThemeHandler = CBHandler::Create(
-		[](const CefString& name, CefRefPtr<CefV8Value> object,
+		// NOLINTNEXTLINE(performance-unnecessary-value-param)
+		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
 		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
 		   CefString& exception) {
 			try {
@@ -308,22 +176,24 @@ namespace Extendify::api::themes {
 					MsgBox::Type::YES_NO);
 				retval = msgbox->promise(
 					CefV8Context::GetCurrentContext(),
-					[themePath](std::shared_ptr<Extendify::util::MsgBox> msgbox,
-								Extendify::util::MsgBox::Result res)
+					[themePath](
+						// NOLINTNEXTLINE(performance-unnecessary-value-param)
+						std::shared_ptr<Extendify::util::MsgBox> /*msgbox*/,
+						Extendify::util::MsgBox::Result res)
 						-> std::expected<CefRefPtr<CefV8Value>, std::string> {
 						if (res == Extendify::util::MsgBox::Result::OK) {
-							std::error_code ec;
-							std::filesystem::remove(themePath, ec);
-							if (ec) {
+							std::error_code errCode;
+							std::filesystem::remove(themePath, errCode);
+							if (errCode) {
 								const auto msg =
 									std::format("Error deleting theme file: {}",
-												ec.message());
+												errCode.message());
 								logger.error(msg);
 								return std::unexpected(msg);
 							}
 							return CefV8Value::CreateBool(true);
-						} else if (res
-								   == Extendify::util::MsgBox::Result::CANCEL) {
+						}
+						if (res == Extendify::util::MsgBox::Result::CANCEL) {
 							return CefV8Value::CreateBool(false);
 						}
 						return std::unexpected(
@@ -340,8 +210,8 @@ namespace Extendify::api::themes {
 
 	static auto addChangeListenerHandler = CBHandler::Create(
 		// NOLINTNEXTLINE(performance-unnecessary-value-param)
-		[](const CefString& name, CefRefPtr<CefV8Value> object,
-		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
+		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
+		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& /*retval*/,
 		   CefString& exception) {
 			try {
 				usage::addChangeListener.validateOrThrow(arguments);
@@ -370,9 +240,9 @@ namespace Extendify::api::themes {
 			;
 		});
 
-	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	static auto getThemesDirHandler = CBHandler::Create(
-		[](const CefString& name, CefRefPtr<CefV8Value> object,
+		// NOLINTNEXTLINE(performance-unnecessary-value-param)
+		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
 		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
 		   CefString& exception) {
 			try {
@@ -388,9 +258,9 @@ namespace Extendify::api::themes {
 			return true;
 		});
 
-	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	static auto getThemesHandler = CBHandler::Create(
-		[](const CefString& name, CefRefPtr<CefV8Value> object,
+		// NOLINTNEXTLINE(performance-unnecessary-value-param)
+		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
 		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
 		   CefString& exception) {
 			try {
@@ -411,9 +281,9 @@ namespace Extendify::api::themes {
 			;
 		});
 
-	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	static auto getThemeDataHandler = CBHandler::Create(
-		[](const CefString& name, CefRefPtr<CefV8Value> object,
+		// NOLINTNEXTLINE(performance-unnecessary-value-param)
+		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
 		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
 		   CefString& exception) {
 			try {
@@ -435,7 +305,7 @@ namespace Extendify::api::themes {
 		});
 
 	[[nodiscard]] CefRefPtr<CefV8Value> makeApi() {
-		const static int _ = []() {
+		[[maybe_unused]] const static int _ = []() {
 			themeCache.initThemes();
 			fs::Watcher::get()->addDir(
 				path::getThemesDir(),
@@ -483,6 +353,123 @@ namespace Extendify::api::themes {
 	bool themeExists(const std::string& fileName) {
 		return std::filesystem::exists(path::getThemesDir() / fileName);
 	};
+
+	void ThemeCache::initThemes() {
+		const auto themesDir = path::getThemesDir();
+		if (!std::filesystem::exists(themesDir)) {
+			logger.info("Themes directory does not exist, no themes to load");
+			return;
+		}
+		const std::scoped_lock lock(themesMutex);
+		const auto iter =
+			std::filesystem::recursive_directory_iterator(themesDir);
+		const auto beforeSize = themes.size();
+		for (const auto& entry : iter) {
+			std::error_code errCode;
+			if (entry.is_regular_file(errCode)) {
+				const auto content = fs::readFile(entry.path());
+				themes.insert(std::make_shared<UserTheme>(getThemeInfo(
+					content,
+					entry.path().lexically_relative(themesDir).string())));
+				logger.debug("loaded theme: {}", entry.path().string());
+			} else if (entry.is_directory(errCode)) {
+				logger.trace("recursing into directory: {}",
+							 entry.path().string());
+			}
+			if (errCode) {
+				logger.warn("error iterating over path {}. msg: {}",
+							entry.path().string(),
+							errCode.message());
+			}
+		}
+		const auto afterSize = themes.size();
+		logger.info("Loaded {} themes from {}",
+					afterSize - beforeSize,
+					themesDir.string());
+		logger.trace("exiting theme loading thread");
+	}
+
+	std::optional<std::shared_ptr<UserTheme>>
+	ThemeCache::getFromName(const std::string& name) const {
+		const std::shared_lock lock(themesMutex);
+		const auto pos = std::ranges::find(themes, name, &UserTheme::name);
+		if (pos != themes.end()) {
+			return *pos;
+		}
+		return {};
+	};
+
+	std::optional<std::shared_ptr<UserTheme>>
+	ThemeCache::getFromFileName(const std::string& fileName) const {
+		const std::shared_lock lock(themesMutex);
+		const auto pos =
+			std::ranges::find(themes, fileName, &UserTheme::fileName);
+		if (pos != themes.end()) {
+			return *pos;
+		}
+		return {};
+	};
+
+	void ThemeCache::dispatchThemeUpdate(const std::string& themeName) {
+		const auto theme = getFromName(themeName);
+		if (!theme) {
+			logger.warn("Attempting to dispatch theme update for a theme "
+						"that does not exist: {}",
+						themeName);
+			return;
+		}
+		dispatchThemeUpdate(path::getThemesDir() / (*theme)->fileName);
+	}
+
+	void ThemeCache::dispatchThemeUpdate(const std::filesystem::path& path) {
+		const auto relativePath =
+			path.lexically_relative(path::getThemesDir()).string();
+		auto theme = getFromFileName(relativePath);
+		std::scoped_lock lock(themesMutex);
+
+		if (theme) {
+			themes.erase(*theme);
+		}
+		if (!std::filesystem::exists(path)
+			|| std::filesystem::is_directory(path)) {
+			return;
+		}
+
+		const auto content = fs::readFile(path);
+		themes.emplace(
+			std::make_shared<UserTheme>(getThemeInfo(content, relativePath)));
+		CefTaskRunner::GetForThread(CefThreadId::TID_RENDERER)
+			->PostTask(TaskCBHandler::Create([relativePath]() {
+				if (!themeChangeContext) {
+					logger.warn("attempting to dispatch a quick css update "
+								"before any listeners are setup");
+					return;
+				}
+				if (!themeChangeContext->IsValid()) {
+					logger.error("quick css context is not valid");
+					return;
+				}
+				themeChangeContext->GetTaskRunner()->PostTask(
+					TaskCBHandler::Create([relativePath]() -> void {
+						for (const auto& callback : themeChangeListeners) {
+							if (!callback->IsFunction()) {
+								logger.warn("cb in theme change listeners that "
+											"is not a function, this "
+											"should never happen");
+								continue;
+							}
+							callback->ExecuteFunctionWithContext(
+								themeChangeContext,
+								nullptr,
+								{CefV8Value::CreateString(relativePath)});
+						}
+					}));
+			}));
+	}
+
+	std::vector<std::shared_ptr<UserTheme>> ThemeCache::getThemes() const {
+		return {themes.begin(), themes.end()};
+	}
 
 	/*!
 	 * BetterDiscord addon meta parser
@@ -611,6 +598,7 @@ namespace Extendify::api::themes {
 		return theme;
 	}
 
+	// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 	UserTheme getThemeInfo(const std::string& css,
 						   const std::string& fileName) {
 		UserTheme theme;
@@ -645,17 +633,17 @@ namespace Extendify::api::themes {
 				// start new field
 				string::trim(accum);
 				theme.set(field, std::move(accum));
-				const auto l = line.find(' ');
-				assert(l != std::string::npos && "TODO: handle this");
-				field = line.substr(1, l);
-				accum = line.substr(l + 1);
+				const auto sep = line.find(' ');
+				assert(sep != std::string::npos && "TODO: handle this");
+				field = line.substr(1, sep);
+				accum = line.substr(sep + 1);
 			} else {
-				std::string l = line;
+				std::string value = line;
 				if (const auto pos = line.find("\\n");
 					pos != std::string::npos) {
-					l = l.replace(pos, 2, "\n");
+					value = value.replace(pos, 2, "\n");
 				}
-				string::replace(l, escapedAtRegex, "@");
+				string::replace(value, escapedAtRegex, "@");
 			}
 		}
 		string::trim(accum);

@@ -11,6 +11,7 @@
 #include <concepts>
 #include <internal/cef_types.h>
 #include <memory>
+#include <unordered_set>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -28,6 +29,10 @@ namespace Extendify::fs {
 #ifdef _WIN32
 
 	namespace {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wlanguage-extension-token"
+
+		// NOLINTBEGIN
 		class CDialogEventHandler final:
 			public IFileDialogEvents,
 			public IFileDialogControlEvents {
@@ -232,6 +237,8 @@ namespace Extendify::fs {
 			return hr;
 		}
 
+		// NOLINTEND
+
 		const char* errStrDialog(HRESULT code) {
 			switch (code) {
 				case REGDB_E_CLASSNOTREG: {
@@ -290,6 +297,11 @@ namespace Extendify::fs {
 
 		class IDialogResult: public IErrorCode {
 		  public:
+			IDialogResult() = default;
+			IDialogResult(const IDialogResult&) = delete;
+			IDialogResult& operator=(const IDialogResult&) = delete;
+			IDialogResult(IDialogResult&&) = delete;
+			IDialogResult& operator=(IDialogResult&&) = delete;
 			[[nodiscard]] virtual std::vector<std::filesystem::path>
 			getItems() = 0;
 			virtual ~IDialogResult() = default;
@@ -308,13 +320,13 @@ namespace Extendify::fs {
 			[[nodiscard]] static std::filesystem::path
 			itemToPath(IShellItem* item) {
 				LPWSTR pszName = nullptr;
-				auto hr = item->GetDisplayName(SIGDN_FILESYSPATH, &pszName);
-				if (FAILED(hr) || !pszName) {
+				auto result = item->GetDisplayName(SIGDN_FILESYSPATH, &pszName);
+				if (FAILED(result) || pszName == nullptr) {
 					logger.error(
 						"Failed to get display name of shell item: code: "
 						"{}, msg: {}",
-						hr,
-						errStrDialog(hr));
+						result,
+						errStrDialog(result));
 					return {};
 				}
 				std::filesystem::path path(pszName);
@@ -333,26 +345,26 @@ namespace Extendify::fs {
 				E_ASSERT(this->get() && "ShellItems is not initialized");
 				std::vector<std::filesystem::path> items;
 				DWORD size = -1;
-				HRESULT hr = this->get()->GetCount(&size);
-				if (FAILED(hr)) {
+				HRESULT result = this->get()->GetCount(&size);
+				if (FAILED(result)) {
 					logger.error(
 						"Failed to get count of shell items: code: {}, msg: {}",
-						hr,
-						errStrDialog(hr));
+						result,
+						errStrDialog(result));
 					return items;
 				}
 				assert(size >= 0 && "ShellItems count is negative");
 				items.reserve(size);
 				IShellItem* item = nullptr;
 				for (auto i = 0; i < size; i++) {
-					hr = get()->GetItemAt(i, &item);
-					if (FAILED(hr)) {
+					result = get()->GetItemAt(i, &item);
+					if (FAILED(result)) {
 						logger.error(
 							"Failed to get shell item at index {}: code: "
 							"{}, msg: {}",
 							i,
-							hr,
-							errStrDialog(hr));
+							result,
+							errStrDialog(result));
 						continue;
 					}
 					E_ASSERT(item && "ShellItem is null");
@@ -364,37 +376,14 @@ namespace Extendify::fs {
 
 		class IFileDialogBase: public IErrorCode {
 		  public:
+			IFileDialogBase(const IFileDialogBase&) = delete;
+			IFileDialogBase& operator=(const IFileDialogBase&) = delete;
+			IFileDialogBase(IFileDialogBase&&) = delete;
+			IFileDialogBase& operator=(IFileDialogBase&&) = delete;
 			virtual ~IFileDialogBase() = default;
 
-			// explicit foo(foo&& other) noexcept:
-			// 	w_ptr_t<T>(std::move(other)),
-			// 	IErrorCode(std::move(other)) {
-			// 	if (this == &other) {
-			// 		return;
-			// 	}
-			// 	advCookies = std::move(other.advCookies);
-			// 	dialogStrings = std::move(other.dialogStrings);
-			// 	title = std::move(other.title);
-			// 	defaultFolder = std::move(other.defaultFolder);
-			// 	filters = std::move(other.filters);
-			// }
-
-			// template<typename Other>
-			// requires std::derived_from<Other, T>
-			// foo<T>& operator=(foo<Other>&& other) noexcept {
-			// 	if (this != &other) {
-			// 		w_ptr_t<T>::operator=(std::move(other));
-			// 		advCookies = std::move(other.advCookies);
-			// 		dialogStrings = std::move(other.dialogStrings);
-			// 		title = std::move(other.title);
-			// 		defaultFolder = std::move(other.defaultFolder);
-			// 		filters = std::move(other.filters);
-			// 	}
-			// 	return *this;
-			// }
-
-			HRESULT advise(w_FileDialogEvents& pfde, DWORD* pdwCookie) {
-				return advise(pfde.get(), pdwCookie);
+			HRESULT advise(w_FileDialogEvents& pfde, DWORD& pdwCookie) {
+				return advise(pfde.get(), &pdwCookie);
 			}
 
 			HRESULT advise(IFileDialogEvents* pfde, DWORD* pdwCookie) {
@@ -405,10 +394,10 @@ namespace Extendify::fs {
 				return this->ptr()->Advise(pfde, pdwCookie);
 			}
 
-			HRESULT getOptions(DWORD* pFlags) {
+			HRESULT getOptions(DWORD& pFlags) {
 				E_ASSERT(pFlags && "pFlags is null");
 				E_ASSERT(this->ptr() && "FileDialog is not initialized");
-				return this->ptr()->GetOptions(pFlags);
+				return this->ptr()->GetOptions(&pFlags);
 			}
 
 			HRESULT setOptions(DWORD flags) {
@@ -421,7 +410,7 @@ namespace Extendify::fs {
 				// doesnt change the capacity
 				dialogStrings.clear();
 				// each filter has a name and a patter, + 2 for default filter
-				dialogStrings.reserve(fileTypes.filters.size() * 2 + 2);
+				dialogStrings.reserve((fileTypes.filters.size() * 2) + 2);
 
 				filters.clear();
 				filters.reserve(fileTypes.filters.size() + 1);
@@ -432,10 +421,10 @@ namespace Extendify::fs {
 				}
 
 				E_ASSERT(this->ptr() && "FileDialog is not initialized");
-				const auto hr =
+				const auto result =
 					this->ptr()->SetFileTypes(filters.size(), filters.data());
-				if (FAILED(hr)) {
-					return hr;
+				if (FAILED(result)) {
+					return result;
 				}
 				// we pass a 0-based array, but set the index as 1-based
 				// more:
@@ -453,10 +442,10 @@ namespace Extendify::fs {
 				return this->ptr()->SetTitle(title.c_str());
 			}
 
-			HRESULT setStateId(const ids::ExtendifyId& id) {
+			HRESULT setStateId(ids::ExtendifyId* stateId) {
 				E_ASSERT(this->ptr() && "FileDialog is not initialized");
-				E_ASSERT(id && "id is null");
-				return this->ptr()->SetClientGuid(ids::extendifyIdToGUID(id));
+				return this->ptr()->SetClientGuid(
+					*ids::extendifyIdToGUID(stateId));
 			}
 
 			HRESULT
@@ -467,9 +456,9 @@ namespace Extendify::fs {
 					return S_OK;
 				}
 
-				auto hr = _setDefaultFolderInternal(path);
-				if (FAILED(hr)) {
-					return hr;
+				auto result = _setDefaultFolderInternal(path);
+				if (FAILED(result)) {
+					return result;
 				}
 				return this->ptr()->SetDefaultFolder(defaultFolder.get());
 			}
@@ -504,9 +493,8 @@ namespace Extendify::fs {
 
 			COMDLG_FILTERSPEC
 			transformFilter(const FilePicker::FileFilter& filter) {
-				constexpr const static auto defaultExt = L"*.*";
-				constexpr const static auto defaultDisplayName =
-					L"Unknown filter";
+				constexpr static auto defaultExt = L"*.*";
+				constexpr static auto defaultDisplayName = L"Unknown filter";
 				COMDLG_FILTERSPEC spec;
 				if (filter.displayName.empty()) {
 					logger.warn("FileFilter has no display name, using "
@@ -537,11 +525,18 @@ namespace Extendify::fs {
 			public UniqueIUnknown<IFileOpenDialog>,
 			public IFileDialogBase {
 		  public:
+			OpenDialogImpl() = default;
+			OpenDialogImpl(const OpenDialogImpl&) = delete;
+			OpenDialogImpl(OpenDialogImpl&&) = delete;
+			OpenDialogImpl& operator=(const OpenDialogImpl&) = delete;
+			OpenDialogImpl& operator=(OpenDialogImpl&&) = delete;
+
 			~OpenDialogImpl() override {
-				if (this->get())
-					for (auto& cookie : advCookies) {
+				if (this->get() != nullptr) {
+					for (const auto& cookie : advCookies) {
 						this->get()->Unadvise(*cookie);
 					}
+				}
 			}
 
 			constexpr static std::unique_ptr<OpenDialogImpl> Create() {
@@ -575,11 +570,18 @@ namespace Extendify::fs {
 			UniqueIUnknown<IFileSaveDialog>,
 			public IFileDialogBase {
 		  public:
+			SaveDialogImpl() = default;
+			SaveDialogImpl(const SaveDialogImpl&) = delete;
+			SaveDialogImpl(SaveDialogImpl&&) = delete;
+			SaveDialogImpl& operator=(const SaveDialogImpl&) = delete;
+			SaveDialogImpl& operator=(SaveDialogImpl&&) = delete;
+
 			~SaveDialogImpl() override {
-				if (this->get())
-					for (auto& cookie : advCookies) {
+				if (this->get() != nullptr) {
+					for (const auto& cookie : advCookies) {
 						this->get()->Unadvise(*cookie);
 					}
+				}
 			}
 
 			constexpr static std::unique_ptr<SaveDialogImpl> Create() {
@@ -609,6 +611,7 @@ namespace Extendify::fs {
 			}
 		};
 
+#pragma GCC diagnostic pop
 	} // namespace
 #endif
 
@@ -618,16 +621,17 @@ namespace Extendify::fs {
 		data(std::move(data)) {
 	}
 
-	[[nodiscard]] CefRefPtr<FilePicker>
+	[[nodiscard]] std::shared_ptr<FilePicker>
 	FilePicker::Create(FilePickerData data) {
-		CefRefPtr<FilePicker> ret = new FilePicker(std::move(data));
+		std::shared_ptr<FilePicker> ret =
+			std::make_shared<FilePicker>(std::move(data));
 		ret->self = ret;
 		return ret;
 	}
 
 	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	[[nodiscard]] CefRefPtr<CefV8Value>
-	FilePicker::promise(CefRefPtr<CefV8Context> _context,
+	FilePicker::promise(const CefRefPtr<CefV8Context>& _context,
 						PromiseCallback _callback) {
 		if (isRunning()) {
 			constexpr auto msg =
@@ -686,8 +690,9 @@ namespace Extendify::fs {
 								E_ASSERT(v8Data.context->IsValid()
 										 && "V8Context is not valid");
 								v8Data.context->GetTaskRunner()->PostTask(
-									util::TaskCBHandler::Create([=,
-																 &v8Data,
+									util::TaskCBHandler::Create([&v8Data,
+																 paths,
+																 err,
 																 this]() {
 										api::util::ScopedV8Context ctx(
 											v8Data.context);
@@ -700,17 +705,6 @@ namespace Extendify::fs {
 										try {
 											ret = v8Data.callback(
 												std::move(self), paths, err);
-										} catch (std::exception& e) {
-											const auto msg = std::format(
-												"Error in FilePicker "
-												"promise "
-												"callback: {}",
-												e.what());
-											logger.error(msg);
-											ret = std::unexpected(
-												std::string(e.what()));
-										}
-										try {
 											if (ret.has_value()) {
 												v8Data.promise->ResolvePromise(
 													std::move(ret.value()));
@@ -720,7 +714,8 @@ namespace Extendify::fs {
 											}
 										} catch (const std::exception& e) {
 											logger.error(
-												"ERROR: at {}:{}, what: {}",
+												"Error in file picker "
+												"callback: at {}:{}, what: {}",
 												__FILE__,
 												__LINE__,
 												e.what());
@@ -750,6 +745,7 @@ namespace Extendify::fs {
 #ifdef E_CHECK_ERR
 #warning "E_CHECK_ERR is already defined, redefining it"
 #endif
+		// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define E_CHECK_ERR(hr)                                                \
 	if (FAILED(hr)) {                                                  \
 		const auto msg = std::format("Error in {}. code: {}, msg: {}", \
@@ -772,16 +768,16 @@ namespace Extendify::fs {
 		// Create an event handling object, and hook it up to the dialog.
 		auto eventsHandler = w_FileDialogEvents::Create();
 		E_CHECK_ERR(eventsHandler.code);
-		DWORD dwCookie;
+		DWORD dwCookie {};
 		// Hook up the event handler.
-		HRESULT hr = fileDialog->advise(eventsHandler, &dwCookie);
-		E_CHECK_ERR(hr);
+		HRESULT result = fileDialog->advise(eventsHandler, dwCookie);
+		E_CHECK_ERR(result);
 		// Set the options on the dialog.
-		DWORD dwFlags;
+		DWORD dwFlags {};
 		// Before setting, always get the options first in order
 		// not to override existing options.
-		hr = fileDialog->getOptions(&dwFlags);
-		E_CHECK_ERR(hr);
+		result = fileDialog->getOptions(dwFlags);
+		E_CHECK_ERR(result);
 		// In this case, get shell items only for file system items.
 		{
 			DWORD flags = dwFlags | FOS_FORCEFILESYSTEM;
@@ -805,38 +801,38 @@ namespace Extendify::fs {
 					E_ASSERT(false && "unhandled DialogType");
 				}
 			}
-			hr = fileDialog->setOptions(flags);
+			result = fileDialog->setOptions(flags);
 		}
-		E_CHECK_ERR(hr);
+		E_CHECK_ERR(result);
 		// set the default file type and file types
-		hr = fileDialog->setFileTypes(data);
-		E_CHECK_ERR(hr);
+		result = fileDialog->setFileTypes(data);
+		E_CHECK_ERR(result);
 		// set the title
-		hr = fileDialog->setTitle(data.title);
-		E_CHECK_ERR(hr);
+		result = fileDialog->setTitle(data.title);
+		E_CHECK_ERR(result);
 		// set the state id
-		hr = fileDialog->setStateId(data.stateId);
-		E_CHECK_ERR(hr);
+		result = fileDialog->setStateId(data.stateId);
+		E_CHECK_ERR(result);
 		// set the default folder
-		hr = fileDialog->setDefaultFolder(data.defaultFolderPath);
-		E_CHECK_ERR(hr);
+		result = fileDialog->setDefaultFolder(data.defaultFolderPath);
+		E_CHECK_ERR(result);
 		// // Set the default extension to be ".css" file.
 		// hr = fileDialog->setDefaultExtension(L"css");
 		// E_CHECK_ERR(hr);
 		// Show the dialog
-		hr = fileDialog->show();
-		if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+		result = fileDialog->show();
+		if (result == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
 			// user cancelled the dialog
 			return {};
 		}
-		E_CHECK_ERR(hr);
+		E_CHECK_ERR(result);
 		// Obtain the result once the user clicks
 		// the 'Open' button.
 		// The result is an IShellItem object.
-		auto result = fileDialog->getResult();
-		E_CHECK_ERR(result->code);
+		auto pickedFiles = fileDialog->getResult();
+		E_CHECK_ERR(pickedFiles->code);
 		// get the file path
-		auto paths = result->getItems();
+		auto paths = pickedFiles->getItems();
 		return paths;
 
 #undef E_CHECK_ERR
@@ -845,25 +841,25 @@ namespace Extendify::fs {
 #endif
 	}
 
-	[[nodiscard]] CefRefPtr<FilePicker> FilePicker::pickOne() {
+	[[nodiscard]] std::shared_ptr<FilePicker> FilePicker::pickOne() {
 		return FilePicker::Create(FilePickerData {
 			.mode = DialogType::OPEN,
 		});
 	}
 
-	[[nodiscard]] CefRefPtr<FilePicker> FilePicker::pickMany() {
+	[[nodiscard]] std::shared_ptr<FilePicker> FilePicker::pickMany() {
 		return FilePicker::Create(FilePickerData {
 			.mode = DialogType::OPEN_MANY,
 		});
 	}
 
-	[[nodiscard]] CefRefPtr<FilePicker> FilePicker::pickFolder() {
+	[[nodiscard]] std::shared_ptr<FilePicker> FilePicker::pickFolder() {
 		return FilePicker::Create(FilePickerData {
 			.mode = DialogType::OPEN_FOLDER,
 		});
 	}
 
-	[[nodiscard]] CefRefPtr<FilePicker> FilePicker::pickSaveFile() {
+	[[nodiscard]] std::shared_ptr<FilePicker> FilePicker::pickSaveFile() {
 		return FilePicker::Create(FilePickerData {
 			.mode = DialogType::SAVE,
 		});

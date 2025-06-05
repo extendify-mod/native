@@ -1,15 +1,12 @@
 #include "fs.hpp"
 
-#include "util/TaskCBHandler.hpp"
-
 #include <cef_command_line.h>
 #include <cef_process_util.h>
 #include <cef_task.h>
 #include <cef_thread.h>
 #include <filesystem>
 #include <fstream>
-#include <include/cef_task.h>
-#include <include/internal/cef_types.h>
+#include <internal/cef_types.h>
 #include <sstream>
 
 #ifdef _WIN32
@@ -151,17 +148,19 @@ namespace Extendify::fs {
 				return;
 			}
 			// https://github.com/microsoft/vscode-cpptools/issues/13644
+			// NOLINTNEXTLINE(concurrency-mt-unsafe)
 			if (std::getenv("ELECTRON_RUN_AS_NODE") != nullptr) {
 				SetEnvironmentVariableA("ELECTRON_RUN_AS_NODE", nullptr);
 			}
 			// https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shellexecutew#return-value
-			INT_PTR ret =
-				(INT_PTR)ShellExecuteW(nullptr,
-									   nullptr,
-									   file.wstring().c_str(),
-									   nullptr,
-									   file.parent_path().wstring().c_str(),
-									   SW_SHOWNORMAL);
+			// NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+			INT_PTR ret = reinterpret_cast<INT_PTR>(
+				ShellExecuteW(nullptr,
+							  nullptr,
+							  file.wstring().c_str(),
+							  nullptr,
+							  file.parent_path().wstring().c_str(),
+							  SW_SHOWNORMAL));
 			if (ret <= 32) {
 				logger.error("ShellExecute failed: {}",
 							 getShellExecuteError(ret));

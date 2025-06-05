@@ -4,13 +4,45 @@
 
 #include <cef_callback.h>
 #include <cef_v8.h>
+#include <filesystem>
+#include <shared_mutex>
+#include <unordered_set>
 
 namespace Extendify::api::themes {
 	extern log::Logger logger;
+	struct UserTheme;
 
 	[[nodiscard]] CefRefPtr<CefV8Value> makeApi();
 
 	[[nodiscard]] bool themeExists(const std::string& fileName);
+
+	class ThemeCache final {
+	  public:
+		ThemeCache() = default;
+		ThemeCache(const ThemeCache&) = delete;
+		ThemeCache& operator=(const ThemeCache&) = delete;
+		ThemeCache(ThemeCache&&) noexcept = delete;
+		ThemeCache& operator=(ThemeCache&&) = delete;
+		~ThemeCache() = default;
+
+		void initThemes();
+
+		[[nodiscard]] std::optional<std::shared_ptr<UserTheme>>
+		getFromName(const std::string& name) const;
+
+		[[nodiscard]] std::optional<std::shared_ptr<UserTheme>>
+		getFromFileName(const std::string& fileName) const;
+
+		void dispatchThemeUpdate(const std::string& themeName);
+
+		void dispatchThemeUpdate(const std::filesystem::path& path);
+
+		[[nodiscard]] std::vector<std::shared_ptr<UserTheme>> getThemes() const;
+
+	  private:
+		mutable std::shared_mutex themesMutex;
+		std::unordered_set<std::shared_ptr<UserTheme>> themes;
+	};
 
 	/*!
 	 * BetterDiscord addon meta parser
@@ -30,6 +62,8 @@ namespace Extendify::api::themes {
 	 * limitations under the License.
 	 */
 	struct UserTheme {
+		void set(const std::string& field, std::string value);
+		[[nodiscard]] CefRefPtr<CefV8Value> toJSON() const;
 		std::string fileName;
 		std::string name;
 		std::string content;
@@ -43,13 +77,6 @@ namespace Extendify::api::themes {
 		std::optional<std::string> source;
 		std::optional<std::string> website;
 		std::optional<std::string> invite;
-		void set(const std::string& field, std::string value);
-		[[nodiscard]] CefRefPtr<CefV8Value> toJSON() const;
-		UserTheme() = default;
-		UserTheme(const UserTheme&) = default;
-		UserTheme(UserTheme&&) noexcept = default;
-		UserTheme& operator=(const UserTheme&) = default;
-		UserTheme& operator=(UserTheme&&) noexcept = default;
 	};
 
 	[[nodiscard]] UserTheme getThemeInfo(const std::string& css,

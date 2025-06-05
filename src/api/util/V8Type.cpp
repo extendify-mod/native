@@ -9,29 +9,41 @@ namespace Extendify::api::util {
 
 		if (value->IsUndefined()) {
 			return V8Type::UNDEFINED;
-		} else if (value->IsNull()) {
+		}
+		if (value->IsNull()) {
 			return V8Type::NULL_TYPE;
-		} else if (value->IsBool()) {
+		}
+		if (value->IsBool()) {
 			return V8Type::BOOL;
-		} else if (value->IsInt()) {
+		}
+		if (value->IsInt()) {
 			return V8Type::INT;
-		} else if (value->IsUInt()) {
+		}
+		if (value->IsUInt()) {
 			return V8Type::UINT;
-		} else if (value->IsDouble()) {
+		}
+		if (value->IsDouble()) {
 			return V8Type::DOUBLE;
-		} else if (value->IsDate()) {
+		}
+		if (value->IsDate()) {
 			return V8Type::DATE;
-		} else if (value->IsString()) {
+		}
+		if (value->IsString()) {
 			return V8Type::STRING;
-		} else if (value->IsArray()) {
+		}
+		if (value->IsArray()) {
 			return V8Type::ARRAY;
-		} else if (value->IsArrayBuffer()) {
+		}
+		if (value->IsArrayBuffer()) {
 			return V8Type::ARRAY_BUFFER;
-		} else if (value->IsFunction()) {
+		}
+		if (value->IsFunction()) {
 			return V8Type::FUNCTION;
-		} else if (value->IsPromise()) {
+		}
+		if (value->IsPromise()) {
 			return V8Type::PROMISE;
-		} else if (value->IsObject()) {
+		}
+		if (value->IsObject()) {
 			return V8Type::OBJECT;
 		}
 		E_ASSERT(false && "Unknown V8 value type");

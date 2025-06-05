@@ -8,8 +8,7 @@ namespace Extendify::api::util {
 
 	class APIUsage {
 	  public:
-		// NOLINTNEXTLINE(google-explicit-constructor)
-		[[nodiscard]] APIUsage(APIFunction func);
+		[[nodiscard]] explicit APIUsage(APIFunction func);
 
 		[[nodiscard]] constexpr std::string getUsage() const noexcept;
 
@@ -38,12 +37,12 @@ namespace Extendify::api::util {
 		typesToString(const std::vector<V8Type>& types) noexcept;
 
 		[[nodiscard]] constexpr static std::vector<std::string>
-		typesToString(const std::vector<uint64_t>& types) noexcept;
+		typesToString(const std::vector<uint16_t>& types) noexcept;
 
 		[[nodiscard]] constexpr static std::string
-		stringifyUnionType(uint64_t type) noexcept;
+		stringifyUnionType(uint16_t type) noexcept;
 
 	  private:
-		const APIFunction func;
+		APIFunction func;
 	};
 } // namespace Extendify::api::util

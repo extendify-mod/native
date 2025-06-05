@@ -12,13 +12,14 @@
 #include <memory>
 #include <thread>
 #include <unordered_map>
+#include <array>
 #include <utility>
 
 namespace Extendify::fs {
 	class Watcher final {
 	  public:
 		static std::shared_ptr<Watcher> get();
-		enum class Reason {
+		enum class Reason: uint8_t {
 			ADDED,
 			REMOVED,
 			MODIFIED,
@@ -27,17 +28,21 @@ namespace Extendify::fs {
 		};
 
 		struct Change {
-			const std::filesystem::path path;
-			const Reason reason;
+			std::filesystem::path path;
+			Reason reason;
 		};
 
 		struct Event: Change {
 			Event(std::filesystem::path path, Reason reason, int watchId);
-			const int watchId;
+			int watchId;
 		};
 
-		typedef std::function<void(std::unique_ptr<Event>)> Callback;
+		using Callback = std::function<void(std::unique_ptr<Event>)>;
 		Watcher();
+		Watcher(const Watcher&) = delete;
+		Watcher(Watcher&&) = delete;
+		Watcher& operator=(const Watcher&) = delete;
+		Watcher& operator=(Watcher&&) = delete;
 		~Watcher();
 		/**
 		 * @brief Adds a file to the watcher
@@ -58,7 +63,7 @@ namespace Extendify::fs {
 		 *
 		 * @param id the id of the file/callback pair to be removed
 		 */
-		void removeFile(int id);
+		void removeFile(int watchId);
 
 		/**
 		 * @brief starts watching for changes
@@ -80,11 +85,11 @@ namespace Extendify::fs {
 
 		class Dir {
 		  public:
-			char buf[2 << 12];
+			std::array<char, 2 << 12> buf;
 			int addFile(const std::filesystem::path& path,
 						const Callback& callback);
 			int addDir(const Callback& callback);
-			void removeWatch(int id);
+			void removeWatch(int watchId);
 			void watch();
 			Dir() = delete;
 			Dir(std::filesystem::path baseDir, HANDLE onChange);

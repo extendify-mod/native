@@ -14,20 +14,20 @@ namespace Extendify::util {
 
 	class MsgBox {
 	  public:
-		enum class Type {
+		enum class Type : uint8_t {
 			OK,
 			YES_NO,
 			OK_CANCEL,
 		};
-		enum class Result {
+		enum class Result : uint8_t {
 			OK, // same as YES
 			CANCEL, // same as NO
 			ERR // an error occurred while showing the message box
 		};
-		typedef std::function<void(std::shared_ptr<MsgBox>, Result)> Callback;
-		typedef std::function<std::expected<CefRefPtr<CefV8Value>, std::string>(
-			std::shared_ptr<MsgBox>, Result)>
-			PromiseCallback;
+		using Callback = std::function<void(std::shared_ptr<MsgBox>, Result)>;
+		using PromiseCallback =
+			std::function<std::expected<CefRefPtr<CefV8Value>, std::string>(
+				std::shared_ptr<MsgBox>, Result)>;
 
 		MsgBox() = default;
 

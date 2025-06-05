@@ -28,6 +28,7 @@ namespace Extendify::util {
 #endif
 	} // namespace
 
+	// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define ensureNotRunning()                                     \
 	if (isRunning()) {                                         \
 		constexpr auto msg =                                   \
@@ -38,6 +39,7 @@ namespace Extendify::util {
 	}
 
 	[[nodiscard]] CefRefPtr<CefV8Value>
+		// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	MsgBox::promise(CefRefPtr<CefV8Context> _context,
 					PromiseCallback callback) {
 		ensureNotRunning();
@@ -133,7 +135,8 @@ namespace Extendify::util {
 		// https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-messageboxw#return-value
 		if (ret == IDOK || ret == IDYES) {
 			return Result::OK; // IDOK and IDYES are the same
-		} else if (ret == IDCANCEL || ret == IDNO) {
+		}
+		if (ret == IDCANCEL || ret == IDNO) {
 			return Result::CANCEL; // IDCANCEL and IDNO are the same
 		}
 

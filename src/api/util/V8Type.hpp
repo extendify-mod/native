@@ -1,9 +1,10 @@
 #pragma once
 #include <cef_v8.h>
+#include <cstdint>
 #include <string>
 
 namespace Extendify::api::util {
-	enum V8Type {
+	enum V8Type : uint16_t {
 		UNDEFINED = 1,
 		NULL_TYPE = 2 << 0,
 		BOOL = 2 << 1,

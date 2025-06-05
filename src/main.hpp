@@ -6,15 +6,30 @@
 
 namespace Extendify {
 	extern log::Logger logger;
+	enum class InitStatus : uint8_t {
+		NOT_STARTED,
+		OK,
+		ERR
+	};
+
+	InitStatus runStart();
+	InitStatus runStop();
 
 	namespace ids {
 		typedef const unsigned char ExtendifyId[16];
 #ifdef _WIN32
 		[[gnu::always_inline]] constexpr const GUID&
-		extendifyIdToGUID(const ExtendifyId& id) {
+		extendifyIdToGUID(const ExtendifyId& eid) {
 			static_assert(sizeof(GUID) == sizeof(ExtendifyId),
 						  "GUID and ExtendifyId must be the same size");
-			return reinterpret_cast<const GUID&>(id);
+			return reinterpret_cast<const GUID&>(eid);
+		}
+
+		[[gnu::always_inline]] constexpr const GUID*
+		extendifyIdToGUID(ExtendifyId* eid) {
+			static_assert(sizeof(GUID) == sizeof(ExtendifyId),
+						  "GUID and ExtendifyId must be the same size");
+			return reinterpret_cast<const GUID*>(eid);
 		}
 #endif
 		// go to https://guidgenerator.com/ to generate

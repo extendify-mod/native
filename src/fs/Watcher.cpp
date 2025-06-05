@@ -29,6 +29,27 @@ static constexpr DWORD events =
 	FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_LAST_WRITE;
 #endif
 
+#ifdef _WIN32
+namespace {
+	constexpr Watcher::Reason reasonFromAction(DWORD action) {
+		switch (action) {
+			case FILE_ACTION_ADDED:
+				return Watcher::Reason::ADDED;
+			case FILE_ACTION_REMOVED:
+				return Watcher::Reason::REMOVED;
+			case FILE_ACTION_MODIFIED:
+				return Watcher::Reason::MODIFIED;
+			case FILE_ACTION_RENAMED_OLD_NAME:
+				return Watcher::Reason::RENAMED_OLD_NAME;
+			case FILE_ACTION_RENAMED_NEW_NAME:
+				return Watcher::Reason::RENAMED_NEW_NAME;
+			default:
+				E_ASSERT(false && "Unknown action type");
+		}
+	}
+} // namespace
+#endif
+
 log::Logger Watcher::logger({"Extendify", "fs", "Watcher"});
 
 std::shared_ptr<Watcher> Extendify::fs::Watcher::get() {
@@ -48,27 +69,8 @@ void Watcher::init() {
 #endif
 }
 
-#ifdef _WIN32
-static constexpr Watcher::Reason reasonFromAction(DWORD action) {
-	switch (action) {
-		case FILE_ACTION_ADDED:
-			return Watcher::Reason::ADDED;
-		case FILE_ACTION_REMOVED:
-			return Watcher::Reason::REMOVED;
-		case FILE_ACTION_MODIFIED:
-			return Watcher::Reason::MODIFIED;
-		case FILE_ACTION_RENAMED_OLD_NAME:
-			return Watcher::Reason::RENAMED_OLD_NAME;
-		case FILE_ACTION_RENAMED_NEW_NAME:
-			return Watcher::Reason::RENAMED_NEW_NAME;
-		default:
-			E_ASSERT(false && "Unknown action type");
-	}
-}
-#endif
-
 Watcher::Event::Event(std::filesystem::path path, Reason reason, int watchId):
-	Change {std::move(path), reason},
+	Change {.path = std::move(path), .reason = reason},
 	watchId(watchId) {
 }
 
@@ -135,11 +137,11 @@ int Watcher::addDir(const std::filesystem::path& path,
 
 void Watcher::runLoop() {
 #ifdef _WIN32
-	DWORD bytesTransferred;
-	OVERLAPPED* overlapped;
+	DWORD bytesTransferred {};
+	OVERLAPPED* overlapped {};
 	while (true) {
 		// Any valid id that maps to a path
-		const std::filesystem::path* dirPath;
+		const std::filesystem::path* dirPath = nullptr;
 		auto ret = GetQueuedCompletionStatus(onChange,
 											 &bytesTransferred,
 											 (ULONG_PTR*)&dirPath,
@@ -171,15 +173,17 @@ void Watcher::runLoop() {
 				continue;
 			}
 			const auto& dir = dirs[*dirPath];
-			const auto& data = dir->buf;
+			const auto& data = dir->buf.data();
 			int64_t offset = 0;
 			FILE_NOTIFY_INFORMATION* cur = nullptr;
 			do {
+				// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
 				cur = (FILE_NOTIFY_INFORMATION*)(data + offset);
 				const auto reason = reasonFromAction(cur->Action);
 				// the filename is relative, not absolute
 				std::filesystem::path filename(dir->baseDir);
 				filename /=
+					// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 					{{cur->FileName, cur->FileNameLength / sizeof(WCHAR)}};
 				pendingEvents.emplace_back(
 					std::move(filename), reason, dir->baseDir);
@@ -226,11 +230,11 @@ Watcher::Dir::Dir(std::filesystem::path baseDir, HANDLE onChange):
 }
 
 void Watcher::Dir::watch() {
-	memset(buf, 0, sizeof(buf));
+	buf = {};
 	memset(&overlapped, 0, sizeof(overlapped));
 	if (!ReadDirectoryChangesW(baseDirHandle,
-							   &buf,
-							   sizeof(buf),
+							   buf.data(),
+							   sizeof(buf.max_size()),
 							   true,
 							   events,
 							   nullptr,
@@ -255,60 +259,61 @@ int Watcher::Dir::addFile(const std::filesystem::path& path,
 						path.string()));
 	}
 	std::scoped_lock lock(callbacksMutex, idsMutex, pathsMutex);
-	auto id = ++nextId;
+	auto watchId = ++nextId;
 	if (ids.contains(path)) {
-		ids[path].push_back(id);
+		ids[path].push_back(watchId);
 	} else {
-		ids[path] = {id};
+		ids[path] = {watchId};
 	}
-	paths[id] = path;
-	callbacks[id] = callback;
-	return id;
+	paths[watchId] = path;
+	callbacks[watchId] = callback;
+	return watchId;
 }
 
 int Watcher::Dir::addDir(const Callback& callback) {
 	E_ASSERT(callback != nullptr && "Callback cannot be null");
 	std::scoped_lock lock(callbacksMutex, idsMutex, pathsMutex);
-	auto id = ++nextId;
+	auto watchId = ++nextId;
 	if (ids.contains(baseDir)) {
-		ids[baseDir].push_back(id);
+		ids[baseDir].push_back(watchId);
 	} else {
-		ids[baseDir] = {id};
+		ids[baseDir] = {watchId};
 	}
-	paths[id] = baseDir;
-	recursiveCallbacks[id] = callback;
-	return id;
+	paths[watchId] = baseDir;
+	recursiveCallbacks[watchId] = callback;
+	return watchId;
 }
 
-void Watcher::Dir::removeWatch(int id) {
+void Watcher::Dir::removeWatch(int watchId) {
 	{
 		std::scoped_lock lock(callbacksMutex);
-		if (callbacks.contains(id)) {
-			callbacks.erase(id);
+		if (callbacks.contains(watchId)) {
+			callbacks.erase(watchId);
 		} else {
-			logger.warn("No callback registered for id {}, ignoring it", id);
+			logger.warn("No callback registered for id {}, ignoring it",
+						watchId);
 		}
 	}
 	std::optional<std::filesystem::path> path;
 	{
 		std::scoped_lock lock(pathsMutex);
-		if (paths.contains(id)) {
-			path = paths[id];
-			paths.erase(id);
+		if (paths.contains(watchId)) {
+			path = paths[watchId];
+			paths.erase(watchId);
 		} else {
-			logger.warn("No path registered for id {}, ignoring it", id);
+			logger.warn("No path registered for id {}, ignoring it", watchId);
 		}
 	}
 	if (path) {
 		std::scoped_lock lock(idsMutex);
 		if (ids.contains(*path)) {
 			auto& vec = ids[*path];
-			if (const auto pos = std::find(vec.begin(), vec.end(), id);
+			if (const auto pos = std::find(vec.begin(), vec.end(), watchId);
 				pos != vec.end()) {
 				vec.erase(pos);
 			} else {
 				logger.warn("No id {} registered for path {}, ignoring it",
-							id,
+							watchId,
 							path->string());
 			}
 		}
@@ -332,15 +337,16 @@ void Watcher::processEvents() {
 					std::scoped_lock lock(dir->idsMutex);
 					if (dir->ids.contains(path)) {
 						const auto& vec = dir->ids[path];
-						for (const auto& id : vec) {
+						for (const auto& watchId : vec) {
 							toProcess.emplace_back(
-								std::make_unique<Event>(path, reason, id),
-								dir->callbacks[id]);
+								std::make_unique<Event>(path, reason, watchId),
+								dir->callbacks[watchId]);
 						}
 					}
-					for (const auto& [id, callback] : dir->recursiveCallbacks) {
+					for (const auto& [watchId, callback] :
+						 dir->recursiveCallbacks) {
 						toProcess.emplace_back(
-							std::make_unique<Event>(path, reason, id),
+							std::make_unique<Event>(path, reason, watchId),
 							callback);
 					}
 				} else {

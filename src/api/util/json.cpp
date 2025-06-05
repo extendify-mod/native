@@ -7,32 +7,34 @@
 #include <stdexcept>
 
 namespace Extendify::api::util::json {
-	static CefRefPtr<CefV8Value> getJsonMethod(const std::string& method) {
-		CefRefPtr<CefV8Context> context = CefV8Context::GetCurrentContext();
-		CefRefPtr<CefV8Value> window = context->GetGlobal();
+	namespace {
+		CefRefPtr<CefV8Value> getJsonMethod(const std::string& method) {
+			CefRefPtr<CefV8Context> context = CefV8Context::GetCurrentContext();
+			CefRefPtr<CefV8Value> window = context->GetGlobal();
 
-		if (!window->HasValue("JSON")) {
-			logger.error("window.JSON does not exist");
-			throw std::runtime_error("window.JSON does not exist");
+			if (!window->HasValue("JSON")) {
+				logger.error("window.JSON does not exist");
+				throw std::runtime_error("window.JSON does not exist");
+			}
+			auto JSON = window->GetValue("JSON");
+			if (!JSON->HasValue(method)) {
+				logger.error("window.JSON.{} does not exist", method);
+				throw std::runtime_error(
+					std::format("window.JSON.{} does not exist", method));
+			}
+			CefRefPtr<CefV8Value> toRet = JSON->GetValue(method);
+			if (!toRet->IsFunction()) {
+				logger.error("window.JSON.{} is not a function", method);
+				throw std::runtime_error(
+					std::format("window.JSON.{} is not a function", method));
+			}
+			return toRet;
 		}
-		auto JSON = window->GetValue("JSON");
-		if (!JSON->HasValue(method)) {
-			logger.error("window.JSON.{} does not exist", method);
-			throw std::runtime_error(
-				std::format("window.JSON.{} does not exist", method));
-		}
-		CefRefPtr<CefV8Value> toRet = JSON->GetValue(method);
-		if (!toRet->IsFunction()) {
-			logger.error("window.JSON.{} is not a function", method);
-			throw std::runtime_error(
-				std::format("window.JSON.{} is not a function", method));
-		}
-		return toRet;
-	}
+	} // namespace
 
 	CefRefPtr<CefV8Value> parse(const CefString& json) {
-		CefRefPtr<CefV8Value> v = CefV8Value::CreateString(json);
-		return parse(v);
+		CefRefPtr<CefV8Value> jsonString = CefV8Value::CreateString(json);
+		return parse(jsonString);
 	};
 
 	CefRefPtr<CefV8Value> parse(const CefRefPtr<CefV8Value>& json) {

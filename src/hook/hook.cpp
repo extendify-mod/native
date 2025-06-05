@@ -18,85 +18,96 @@ using namespace Extendify;
 
 long hook::hookFunction(void* orig, void* hookFunc) {
 	std::string msg;
-	bool abort = false;
-	long ret;
+	bool isTransactionToAbort = false;
+	long ret {};
+	auto handleError = [&isTransactionToAbort, &msg, &ret]() {
+		logger.error("Error while hooking function: {}", msg);
+		if (isTransactionToAbort) {
+			logger.debug("Trying to abort errored transaction");
+			auto abortErrCode = DetourTransactionAbort();
+			if (abortErrCode != NO_ERROR) {
+				logger.error("Error while aborting transaction: {}",
+							 abortErrCode);
+			}
+		}
+		return ret;
+	};
 	ret = DetourTransactionBegin();
 	if (ret != NO_ERROR) {
 		switch (ret) {
-			case ERROR_INVALID_OPERATION:
+			case ERROR_INVALID_OPERATION: {
 				msg = "ERROR_INVALID_OPERATION: A pending transaction already "
 					  "exists.";
-				goto err;
+				break;
+			}
 			default:
 				msg = "Unknown error: " + std::to_string(ret);
-				goto err;
 		}
+		return handleError();
 	}
-	abort = true;
+	isTransactionToAbort = true;
 	ret = DetourUpdateThread(GetCurrentThread());
 	if (ret != NO_ERROR) {
 		switch (ret) {
-			case ERROR_NOT_ENOUGH_MEMORY:
+			case ERROR_NOT_ENOUGH_MEMORY: {
 				msg = "ERROR_NOT_ENOUGH_MEMORY: Not enough memory is available "
 					  "to complete the operation.";
-				goto err;
+				break;
+			}
 			default:
 				msg = "Unknown error: " + std::to_string(ret);
-				goto err;
 		}
+		return handleError();
 	}
 	ret = DetourAttach((void**)orig, hookFunc);
 	if (ret != NO_ERROR) {
 		switch (ret) {
-			case ERROR_INVALID_BLOCK:
+			case ERROR_INVALID_BLOCK: {
 				msg = "ERROR_INVALID_BLOCK: The specified function is too "
 					  "small to be hooked.";
-				goto err;
-			case ERROR_INVALID_HANDLE:
+				break;
+			}
+			case ERROR_INVALID_HANDLE: {
 				msg = "ERROR_INVALID_HANDLE: The original function is null or "
 					  "points to a null pointer.";
-				goto err;
-			case ERROR_INVALID_OPERATION:
+				break;
+			}
+			case ERROR_INVALID_OPERATION: {
 				msg = "ERROR_INVALID_OPERATION: No pending transaction exists.";
-				goto err;
-			case ERROR_NOT_ENOUGH_MEMORY:
+				break;
+			}
+			case ERROR_NOT_ENOUGH_MEMORY: {
 				msg = "ERROR_NOT_ENOUGH_MEMORY: Not enough memory is available "
 					  "to complete the operation.";
-				goto err;
+				break;
+			}
 			default:
 				msg = "Unknown error: " + std::to_string(ret);
-				goto err;
 		}
+		return handleError();
 	}
 	ret = DetourTransactionCommit();
 	if (ret != NO_ERROR) {
 		switch (ret) {
-			case ERROR_INVALID_OPERATION:
+			case ERROR_INVALID_OPERATION: {
 				msg = "ERROR_INVALID_OPERATION: No pending transaction exists.";
-				goto err;
-			case ERROR_INVALID_DATA:
+				break;
+			}
+			case ERROR_INVALID_DATA: {
 				msg = "ERROR_INVALID_DATA: Target function was changed by "
 					  "third party bewteen steps of the transaction.";
-				goto err;
+				break;
+			}
 			default:
 				msg = "Unknown error: " + std::to_string(ret);
-				goto err;
 		}
+		return handleError();
 	}
 	return 0;
-err:
-	logger.error("Error while hooking function: {}", msg);
-	if (abort) {
-		logger.debug("Trying to abort errored transaction");
-		auto c = DetourTransactionAbort();
-		if (c != NO_ERROR) {
-			logger.error("Error while aborting transaction: {}", c);
-		}
-	}
-	return ret;
 }
 
-long hook::unhookFunction(void* orig, void* hookFunc) {
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+long hook::unhookFunction(void* /*orig*/, void* /*hookFunc*/) {
 #warning TODO
 	throw std::runtime_error("Unhooking function is not implemented");
 }

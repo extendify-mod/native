@@ -1,9 +1,9 @@
 #include "CBHandler.hpp"
 
 namespace Extendify::api::util {
-	CefRefPtr<CBHandler> CBHandler::Create(Callback h) {
+	CefRefPtr<CBHandler> CBHandler::Create(Callback callback) {
 		CefRefPtr<CBHandler> ret = new CBHandler;
-		ret->setCallback(std::move(h));
+		ret->setCallback(std::move(callback));
 		return ret;
 	}
 
@@ -11,7 +11,7 @@ namespace Extendify::api::util {
 		return handler(name, object, arguments, retval, exception);
 	}
 
-	void CBHandler::setCallback(Callback h) {
-		handler = std::move(h);
+	void CBHandler::setCallback(Callback callback) {
+		handler = std::move(callback);
 	}
 } // namespace Extendify::api::util

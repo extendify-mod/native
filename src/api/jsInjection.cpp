@@ -11,28 +11,30 @@
 #define f_ret  cef_v8_value_t*
 #define f_args const cef_string_t *name, cef_v8_handler_t *handler
 
-static f_ret (*origFunc)(f_args) = cef_v8_value_create_function;
-
 static const CefStringUTF16 windowFuncName = "sendCosmosRequest";
 
 namespace Extendify::api::jsInjection {
-	static f_ret hookFunc(f_args) {
-		logger.trace("in cef_v8_value_create_function");
-		CefStringUTF16 nameStr;
-		nameStr.FromString16(name->str, name->length);
-		if (nameStr == windowFuncName) {
-			logger.info(
-				"Found window context using function {}, injecting native API",
-				nameStr.ToString());
-			api::inject(CefV8Context::GetEnteredContext());
+	namespace {
+		f_ret (*origFunc)(f_args) = cef_v8_value_create_function;
+
+		f_ret hookFunc(f_args) {
+			logger.trace("in cef_v8_value_create_function");
+			CefStringUTF16 nameStr;
+			nameStr.FromString16(name->str, name->length);
+			if (nameStr == windowFuncName) {
+				logger.info("Found window context using function {}, injecting "
+							"native API",
+							nameStr.ToString());
+				api::inject(CefV8Context::GetEnteredContext());
+			}
+			logger.debug("function name is {}", nameStr.ToString());
+			logger.debug("function handler is {:#10x}", (size_t)handler);
+			return origFunc(name, handler);
 		}
-		logger.debug("function name is {}", nameStr.ToString());
-		logger.debug("function handler is {}", (size_t)handler);
-		return origFunc(name, handler);
-	}
+	} // namespace
 
 	void init() {
-		hook::hookFunction(&origFunc, (void*)hookFunc);
+		hook::hookFunction(static_cast<void*>(&origFunc), (void*)hookFunc);
 	}
 
 	void cleanup() {

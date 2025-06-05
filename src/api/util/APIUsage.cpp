@@ -46,14 +46,12 @@ namespace Extendify::api::util {
 		}
 		for (auto i = 0; i < arguments.size(); i++) {
 			if (getV8Type(arguments[i]) != func.expectedArgs[i]) {
-				goto err;
+				return std::format("Invalid usage. Expected {}. Got {}",
+								   getUsage(),
+								   makeActualUsageString(arguments));
 			}
 		}
 		return {};
-err:
-		return std::format("Invalid usage. Expected {}. Got {}",
-						   getUsage(),
-						   makeActualUsageString(arguments));
 	}
 
 	[[nodiscard]] std::string APIUsage::makeActualUsageString(
@@ -91,7 +89,7 @@ err:
 	}
 
 	[[nodiscard]] constexpr std::vector<std::string>
-	APIUsage::typesToString(const std::vector<uint64_t>& types) noexcept {
+	APIUsage::typesToString(const std::vector<uint16_t>& types) noexcept {
 		return Extendify::util::iter::map(types,
 										  [](uint64_t type) -> std::string {
 											  return stringifyUnionType(type);
@@ -99,7 +97,7 @@ err:
 	}
 
 	[[nodiscard]] constexpr std::string
-	APIUsage::stringifyUnionType(uint64_t type) noexcept {
+	APIUsage::stringifyUnionType(uint16_t type) noexcept {
 		if (!type) {
 			return {};
 		}
