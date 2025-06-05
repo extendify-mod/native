@@ -2,9 +2,7 @@
 
 #include "log/Logger.hpp"
 
-#include <stdexcept>
 #include <string>
-
 
 namespace Extendify::hook {
 	log::Logger logger({"Extendify", "hook"});
@@ -111,9 +109,94 @@ long hook::hookFunction(void* orig, void* hookFunc) {
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-long hook::unhookFunction(void* /*orig*/, void* /*hookFunc*/) {
-#warning TODO
-	throw std::runtime_error("Unhooking function is not implemented");
+long hook::unhookFunction(void* orig, void* hookFunc) {
+	std::string msg;
+	bool isTransactionToAbort = false;
+	long ret {};
+	auto handleError = [&isTransactionToAbort, &msg, &ret]() {
+		logger.error("Error while unhooking function: {}", msg);
+		if (isTransactionToAbort) {
+			logger.debug("Trying to abort errored transaction");
+			auto abortErrCode = DetourTransactionAbort();
+			if (abortErrCode != NO_ERROR) {
+				logger.error("Error while aborting transaction: {}",
+							 abortErrCode);
+			}
+		}
+		return ret;
+	};
+	ret = DetourTransactionBegin();
+	if (ret != NO_ERROR) {
+		switch (ret) {
+			case ERROR_INVALID_OPERATION: {
+				msg = "ERROR_INVALID_OPERATION: A pending transaction already "
+					  "exists.";
+				break;
+			}
+			default:
+				msg = "Unknown error: " + std::to_string(ret);
+		}
+		return handleError();
+	}
+	isTransactionToAbort = true;
+	ret = DetourUpdateThread(GetCurrentThread());
+	if (ret != NO_ERROR) {
+		switch (ret) {
+			case ERROR_NOT_ENOUGH_MEMORY: {
+				msg = "ERROR_NOT_ENOUGH_MEMORY: Not enough memory is available "
+					  "to complete the operation.";
+				break;
+			}
+			default:
+				msg = "Unknown error: " + std::to_string(ret);
+		}
+		return handleError();
+	}
+	ret = DetourDetach((void**)orig, hookFunc);
+	if (ret != NO_ERROR) {
+		switch (ret) {
+			case ERROR_INVALID_BLOCK: {
+				msg =
+					"The function to be detached was too small to be detoured.";
+				break;
+			}
+			case ERROR_INVALID_HANDLE: {
+				msg = "ERROR_INVALID_HANDLE: The original function is null or "
+					  "points to a null pointer.";
+				break;
+			}
+			case ERROR_INVALID_OPERATION: {
+				msg = "ERROR_INVALID_OPERATION: No pending transaction exists.";
+				break;
+			}
+			case ERROR_NOT_ENOUGH_MEMORY: {
+				msg = "ERROR_NOT_ENOUGH_MEMORY: Not enough memory is available "
+					  "to complete the operation.";
+				break;
+			}
+			default:
+				msg = "Unknown error: " + std::to_string(ret);
+		}
+		return handleError();
+	}
+	ret = DetourTransactionCommit();
+	if (ret != NO_ERROR) {
+		switch (ret) {
+			case ERROR_INVALID_OPERATION: {
+				msg = "ERROR_INVALID_OPERATION: No pending transaction exists.";
+				break;
+			}
+			case ERROR_INVALID_DATA: {
+				msg = "ERROR_INVALID_DATA: Target function was changed by "
+					  "third party bewteen steps of the transaction.";
+				break;
+			}
+			default:
+				msg = "Unknown error: " + std::to_string(ret);
+		}
+		return handleError();
+	}
+	return 0;
 }
 
 #elif defined(__linux__)
