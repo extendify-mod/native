@@ -1,8 +1,12 @@
 #include "ScopedV8Context.hpp"
 
 #include "log/log.hpp"
+#include "log/Logger.hpp"
 
 #include <cef_v8.h>
+#include <internal/cef_ptr.h>
+#include <utility>
+
 
 namespace Extendify::api::util {
 	ScopedV8Context::ScopedV8Context(CefRefPtr<CefV8Context> _context):

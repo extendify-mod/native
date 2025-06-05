@@ -1,21 +1,28 @@
 #include "fs.hpp"
 
+#include "log/log.hpp"
+#include "log/Logger.hpp"
+
+#include <algorithm>
 #include <cef_command_line.h>
 #include <cef_process_util.h>
 #include <cef_task.h>
 #include <cef_thread.h>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <internal/cef_types.h>
 #include <sstream>
+#include <stdexcept>
+#include <string>
 
 #ifdef _WIN32
-#include "log/log.hpp"
 
-#include <objbase.h>
+#include <basetsd.h>
 #include <processenv.h>
+#include <shellapi.h>
 #include <winerror.h>
-
+#include <winuser.h>
 #endif
 
 namespace Extendify::fs {

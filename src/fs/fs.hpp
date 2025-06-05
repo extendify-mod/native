@@ -3,6 +3,7 @@
 #include "log/Logger.hpp"
 
 #include <filesystem>
+#include <string>
 
 namespace Extendify::fs {
 	extern log::Logger logger;

@@ -8,18 +8,39 @@
 #include "util/TaskCBHandler.hpp"
 
 #include <cef_task.h>
+#include <cef_thread.h>
+#include <cef_v8.h>
 #include <concepts>
+#include <exception>
+#include <expected>
+#include <filesystem>
+#include <format>
+#include <internal/cef_ptr.h>
 #include <internal/cef_types.h>
 #include <memory>
+#include <new>
+#include <optional>
+#include <stdexcept>
+#include <string>
 #include <unordered_set>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #ifdef _WIN32
-#include <windows.h>
 #define STRICT_TYPED_ITEMIDS
+#include <combaseapi.h>
+#include <minwindef.h>
+#include <propsys.h>
 #include <shlwapi.h>
 #include <shobjidl.h>
 #include <shobjidl_core.h>
+#include <shtypes.h>
+#include <unknwnbase.h>
+#include <winerror.h>
 #include <winnt.h>
+#include <wtypesbase.h>
+
 
 #endif
 
@@ -147,7 +168,7 @@ namespace Extendify::fs {
 				hr = pfsd->GetFileTypeIndex(
 					&uIndex); // index of current file-type
 				if (SUCCEEDED(hr)) {
-					IPropertyDescriptionList* pdl = NULL;
+					IPropertyDescriptionList* pdl = nullptr;
 
 					// NOLINTNEXTLINE(hicpp-multiway-paths-covered) ms code
 					switch (uIndex) {
@@ -353,7 +374,7 @@ namespace Extendify::fs {
 						errStrDialog(result));
 					return items;
 				}
-				assert(size >= 0 && "ShellItems count is negative");
+				E_ASSERT(size >= 0 && "ShellItems count is negative");
 				items.reserve(size);
 				IShellItem* item = nullptr;
 				for (auto i = 0; i < size; i++) {

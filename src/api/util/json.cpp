@@ -4,7 +4,10 @@
 
 #include <cef_v8.h>
 #include <format>
+#include <internal/cef_ptr.h>
+#include <internal/cef_string.h>
 #include <stdexcept>
+#include <string>
 
 namespace Extendify::api::util::json {
 	namespace {

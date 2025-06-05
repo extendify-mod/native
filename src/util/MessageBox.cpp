@@ -1,14 +1,31 @@
 #include "MessageBox.hpp"
 
 #include "api/util/ScopedV8Context.hpp"
+#include "api/util/V8CallbackData.hpp"
 #include "log/log.hpp"
 #include "string.hpp"
 #include "util/TaskCBHandler.hpp"
 #include "util/util.hpp"
 
+#include <cef_task.h>
+#include <cef_thread.h>
+#include <cef_v8.h>
+#include <exception>
 #include <internal/cef_ptr.h>
 #include <internal/cef_types.h>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <utility>
 #include <variant>
+
+
+#ifdef _WIN32
+#include <errhandlingapi.h>
+#include <minwindef.h>
+#include <winuser.h>
+
+#endif
 
 namespace Extendify::util {
 	namespace {
@@ -39,7 +56,7 @@ namespace Extendify::util {
 	}
 
 	[[nodiscard]] CefRefPtr<CefV8Value>
-		// NOLINTNEXTLINE(performance-unnecessary-value-param)
+	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	MsgBox::promise(CefRefPtr<CefV8Context> _context,
 					PromiseCallback callback) {
 		ensureNotRunning();

@@ -1,10 +1,13 @@
 #include "api.hpp"
 
+#include "log/Logger.hpp"
 #include "quickCss.hpp"
 #include "settings.hpp"
 #include "themes.hpp"
 
 #include <cef_v8.h>
+#include <internal/cef_ptr.h>
+#include <internal/cef_types.h>
 
 namespace Extendify::api {
 	log::Logger logger({"Extendify", "api"});

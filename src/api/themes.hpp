@@ -5,8 +5,13 @@
 #include <cef_callback.h>
 #include <cef_v8.h>
 #include <filesystem>
+#include <internal/cef_ptr.h>
+#include <memory>
+#include <optional>
 #include <shared_mutex>
+#include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace Extendify::api::themes {
 	extern log::Logger logger;

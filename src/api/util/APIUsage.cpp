@@ -1,9 +1,21 @@
 #include "APIUsage.hpp"
 
+#include "APIFunction.hpp"
 #include "util/iter.hpp"
 #include "util/string.hpp"
+#include "V8Type.hpp"
 
+#include <cef_v8.h>
+#include <cstdint>
 #include <format>
+#include <internal/cef_ptr.h>
+#include <optional>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
 
 namespace Extendify::api::util {
 	[[nodiscard]] APIUsage::APIUsage(APIFunction func):

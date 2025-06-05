@@ -1,6 +1,10 @@
 #include "hook.hpp"
 
+#include "log/Logger.hpp"
+
+#include <stdexcept>
 #include <string>
+
 
 namespace Extendify::hook {
 	log::Logger logger({"Extendify", "hook"});

@@ -2,7 +2,7 @@
 #include <cef_base.h>
 #include <cef_task.h>
 #include <functional>
-
+#include <internal/cef_ptr.h>
 
 namespace Extendify::util {
 	class TaskCBHandler: public CefTask {

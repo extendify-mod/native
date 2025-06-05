@@ -2,24 +2,35 @@
 #include "log/log.hpp"
 #include "log/Logger.hpp"
 
+#include <array>
 #include <atomic>
 #include <cef_thread.h>
+#include <cstdint>
 #include <deque>
 #include <filesystem>
 #include <format>
 #include <functional>
-#include <include/internal/cef_ptr.h>
+#include <internal/cef_ptr.h>
 #include <memory>
+#include <mutex>
 #include <thread>
+#include <tuple>
 #include <unordered_map>
-#include <array>
 #include <utility>
+#include <vector>
+
+
+#ifdef _WIN32
+#include <minwinbase.h>
+#include <winnt.h>
+
+#endif
 
 namespace Extendify::fs {
 	class Watcher final {
 	  public:
 		static std::shared_ptr<Watcher> get();
-		enum class Reason: uint8_t {
+		enum class Reason : uint8_t {
 			ADDED,
 			REMOVED,
 			MODIFIED,

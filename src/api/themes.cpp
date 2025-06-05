@@ -5,6 +5,7 @@
 #include "fs/FilePicker.hpp"
 #include "fs/fs.hpp"
 #include "fs/Watcher.hpp"
+#include "log/Logger.hpp"
 #include "main.hpp"
 #include "path/path.hpp"
 #include "util/APIFunction.hpp"
@@ -14,12 +15,28 @@
 #include "util/TaskCBHandler.hpp"
 #include "util/V8Type.hpp"
 
+#include <algorithm>
+#include <cassert>
+#include <cef_task.h>
 #include <cef_v8.h>
+#include <exception>
+#include <expected>
 #include <filesystem>
+#include <format>
 #include <internal/cef_ptr.h>
+#include <internal/cef_string.h>
+#include <internal/cef_types.h>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <regex>
 #include <shared_mutex>
+#include <stdexcept>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
+
 
 namespace Extendify::api::themes {
 	namespace {

@@ -1,9 +1,12 @@
 #pragma once
 
 #include <initializer_list>
+#include <memory>
 #include <spdlog/common.h>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/sink.h>
+#include <string>
+#include <vector>
 
 namespace Extendify::log {
 	class Logger final: public spdlog::logger {

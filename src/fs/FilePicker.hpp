@@ -2,6 +2,7 @@
 
 #include "main.hpp"
 
+#include <atomic>
 #include <cef_base.h>
 #include <cef_thread.h>
 #include <cef_v8.h>
@@ -9,14 +10,14 @@
 #include <expected>
 #include <filesystem>
 #include <functional>
+#include <internal/cef_ptr.h>
 #include <memory>
+#include <optional>
+#include <string>
 #include <variant>
+#include <vector>
 
 namespace Extendify::fs {
-	/**
-	 * YOU ARE RESPONSIBLE FOR MAKING SURE THAT THIS LIVES LONGER THAN THE
-	 * PROMISE
-	 */
 	class FilePicker {
 	  public:
 		enum class DialogType : uint8_t {

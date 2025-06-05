@@ -4,19 +4,30 @@
 #include "log/Logger.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
+#include <cstring>
+#include <deque>
 #include <exception>
 #include <filesystem>
+#include <format>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <thread>
 #include <utility>
 #ifdef _WIN32
-#include <windows.h>
 
 #include <basetsd.h>
+#include <errhandlingapi.h>
+#include <fileapi.h>
+#include <handleapi.h>
 #include <ioapiset.h>
+#include <minwinbase.h>
+#include <minwindef.h>
 #include <synchapi.h>
+#include <winbase.h>
 #include <winnt.h>
 
 #endif

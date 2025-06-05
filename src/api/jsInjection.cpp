@@ -6,7 +6,9 @@
 #include <capi/cef_v8_capi.h>
 #include <cef_callback.h> // needed because of error in cef_v8.h, must come before it
 #include <cef_v8.h>
-#include <include/internal/cef_string_wrappers.h>
+#include <cstddef>
+#include <internal/cef_string.h>
+#include <internal/cef_string_wrappers.h>
 
 #define f_ret  cef_v8_value_t*
 #define f_args const cef_string_t *name, cef_v8_handler_t *handler

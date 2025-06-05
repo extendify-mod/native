@@ -3,3 +3,8 @@ If:
     PathExclude: [src/.*, deps/wrapper/*]
 Diagnostics:
     Suppress: '*'
+---
+If:
+    PathMatch: [src/.*, deps/wrapper/*]
+Diagnostics:
+    MissingIncludes: Strict

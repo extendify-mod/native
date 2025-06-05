@@ -1,11 +1,14 @@
 #include "main.hpp"
 
 #include "api/entrypoint.hpp"
+#include "log/Logger.hpp"
 
 #include <cef_version_info.h>
+#include <exception>
 
 #ifdef _WIN32
-#include <windows.h>
+#include <minwindef.h>
+#include <winnt.h>
 #endif
 
 namespace Extendify {
@@ -27,7 +30,8 @@ namespace Extendify {
 
 #if defined(_WIN32)
 // NOLINTNEXTLINE(misc-use-internal-linkage)
-BOOL WINAPI DllMain(HINSTANCE  /*hinstDLL*/, DWORD fdwReason, LPVOID  /*lpvReserved*/) {
+BOOL WINAPI DllMain(HINSTANCE /*hinstDLL*/, DWORD fdwReason,
+					LPVOID /*lpvReserved*/) {
 	Extendify::InitStatus ret = Extendify::InitStatus::NOT_STARTED;
 	switch (fdwReason) {
 		case DLL_PROCESS_ATTACH:

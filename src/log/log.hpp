@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <iostream>
+#include <print>
 
 [[gnu::always_inline]] [[noreturn]] inline bool
 e_abort(const char* msg, const char* file, int line, const char* func) {

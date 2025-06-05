@@ -1,7 +1,11 @@
 #pragma once
 
+#include <cef_base.h>
 #include <cef_v8.h>
 #include <functional>
+#include <internal/cef_ptr.h>
+#include <internal/cef_string.h>
+
 
 #define CB_HANDLER_ARGS                                                \
 	const CefString &name, CefRefPtr<CefV8Value> object,               \

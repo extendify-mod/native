@@ -2,6 +2,11 @@
 
 #include "log/log.hpp"
 
+#include <cef_v8.h>
+#include <internal/cef_ptr.h>
+#include <string>
+
+
 namespace Extendify::api::util {
 
 	[[nodiscard]] V8Type getV8Type(const CefRefPtr<CefV8Value>& value) {

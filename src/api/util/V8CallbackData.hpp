@@ -1,4 +1,6 @@
+#pragma once
 #include <cef_v8.h>
+#include <internal/cef_ptr.h>
 
 namespace Extendify::api::util {
 	template<typename T>

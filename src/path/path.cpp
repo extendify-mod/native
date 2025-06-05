@@ -1,9 +1,14 @@
 #include "path.hpp"
 
 #include "api/settings.hpp"
+#include "log/Logger.hpp"
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <optional>
+#include <stdexcept>
+#include <string>
 
 using namespace Extendify;
 namespace fs = std::filesystem;

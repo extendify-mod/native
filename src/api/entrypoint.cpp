@@ -6,7 +6,10 @@
 #include "jsInjection.hpp"
 
 #include <capi/cef_app_capi.h>
-#include <include/internal/cef_types.h>
+#include <internal/cef_types.h>
+#include <internal/cef_types_win.h>
+#include <stdexcept>
+
 
 #define f_ret int
 #define f_args                                                           \

@@ -2,6 +2,7 @@
 #include "log/Logger.hpp"
 
 #include <filesystem>
+#include <string>
 
 namespace Extendify::path {
 	extern log::Logger logger;

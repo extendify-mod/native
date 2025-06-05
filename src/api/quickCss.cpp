@@ -11,8 +11,17 @@
 #include "util/V8Type.hpp"
 
 #include <cef_base.h>
+#include <cef_task.h>
 #include <cef_v8.h>
+#include <exception>
+#include <format>
+#include <internal/cef_ptr.h>
+#include <internal/cef_string.h>
+#include <internal/cef_types.h>
 #include <memory>
+#include <optional>
+#include <string>
+
 
 namespace Extendify::api::quickCss {
 	namespace {
@@ -176,7 +185,7 @@ namespace Extendify::api::quickCss {
 		if (!watcherId) {
 			watcherId = fs::Watcher::get()->addFile(
 				path::getQuickCssFile(),
-				[](std::unique_ptr<fs::Watcher::Event>  /*event*/) {
+				[](std::unique_ptr<fs::Watcher::Event> /*event*/) {
 					logger.debug(
 						"change in quick css file; dispatching update");
 					dispatchQuickCssUpdate();

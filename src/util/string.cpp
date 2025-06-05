@@ -3,9 +3,11 @@
 #include "log/log.hpp"
 
 #include <cstdlib>
+#include <memory>
 #include <regex>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace Extendify::util::string {
 

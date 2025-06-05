@@ -1,12 +1,15 @@
 #pragma once
 #include "api/util/V8CallbackData.hpp"
 
+#include <atomic>
 #include <cef_thread.h>
 #include <cef_v8.h>
+#include <cstdint>
 #include <expected>
 #include <functional>
 #include <internal/cef_ptr.h>
 #include <memory>
+#include <string>
 #include <variant>
 
 namespace Extendify::util {

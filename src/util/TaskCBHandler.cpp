@@ -2,6 +2,8 @@
 
 #include "log/log.hpp"
 
+#include <functional>
+#include <internal/cef_ptr.h>
 #include <utility>
 
 namespace Extendify::util {

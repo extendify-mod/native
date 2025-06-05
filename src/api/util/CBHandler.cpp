@@ -1,4 +1,6 @@
 #include "CBHandler.hpp"
+#include <internal/cef_ptr.h>
+#include <utility>
 
 namespace Extendify::api::util {
 	CefRefPtr<CBHandler> CBHandler::Create(Callback callback) {

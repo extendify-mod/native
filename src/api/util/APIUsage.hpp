@@ -3,6 +3,10 @@
 #include "V8Type.hpp"
 
 #include <cef_v8.h>
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace Extendify::api::util {
 

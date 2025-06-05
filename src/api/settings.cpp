@@ -7,9 +7,16 @@
 #include "util/APIUsage.hpp"
 #include "util/CBHandler.hpp"
 #include "util/json.hpp"
+#include "util/V8Type.hpp"
 
 #include <cef_base.h>
 #include <cef_v8.h>
+#include <exception>
+#include <internal/cef_ptr.h>
+#include <internal/cef_string.h>
+#include <internal/cef_types.h>
+#include <string>
+
 
 namespace Extendify::api::settings {
 	using util::APIFunction;

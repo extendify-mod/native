@@ -5,10 +5,16 @@
 
 #include <algorithm>
 #include <initializer_list>
+#include <memory>
 #include <spdlog/common.h>
+#include <spdlog/logger.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
 
 using namespace Extendify::log;
 

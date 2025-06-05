@@ -3,10 +3,11 @@
 #include "log/Logger.hpp"
 
 #include <cef_command_line.h>
+#include <cef_process_message.h>
 #include <expected>
 #include <filesystem>
-#include <include/cef_process_message.h>
-#include <include/internal/cef_types.h>
+#include <internal/cef_types.h>
+#include <string>
 
 namespace Extendify::util {
 	extern log::Logger logger;

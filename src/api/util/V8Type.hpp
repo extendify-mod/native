@@ -1,6 +1,7 @@
 #pragma once
 #include <cef_v8.h>
 #include <cstdint>
+#include <internal/cef_ptr.h>
 #include <string>
 
 namespace Extendify::api::util {
