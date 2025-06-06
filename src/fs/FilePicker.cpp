@@ -8,6 +8,7 @@
 #include "util/iter.hpp"
 #include "util/TaskCBHandler.hpp"
 #include "util/util.hpp"
+#include "util/string.hpp"
 
 #include <cef_task.h>
 #include <cef_thread.h>

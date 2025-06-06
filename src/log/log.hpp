@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-[[gnu::always_inline]] [[noreturn]] inline void
+[[gnu::always_inline]] [[noreturn]] inline bool
 e_abort(const char* msg, const char* file, int line, const char* func) {
 	// NOLINTNEXTLINE
 	fprintf(stderr, "%s:%d:%s: Assertion `%s` failed.", file, line, func, msg);
