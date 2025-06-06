@@ -1,13 +1,16 @@
 #include "string.hpp"
 
-#include "log/log.hpp"
-
 #include <cstdlib>
-#include <memory>
 #include <regex>
-#include <sstream>
 #include <string>
 #include <vector>
+
+#ifdef _WIN32
+#include "log/log.hpp"
+
+#include <memory>
+#include <sstream>
+#endif
 
 namespace Extendify::util::string {
 

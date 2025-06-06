@@ -7,9 +7,13 @@
 
 #include <capi/cef_app_capi.h>
 #include <internal/cef_types.h>
-#include <internal/cef_types_win.h>
 #include <stdexcept>
 
+#ifdef _WIN32
+#include <internal/cef_types_win.h>
+#elif defined(__linux__)
+#include <internal/cef_types_linux.h>
+#endif
 
 #define f_ret int
 #define f_args                                                           \

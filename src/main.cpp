@@ -47,17 +47,19 @@ BOOL WINAPI DllMain(HINSTANCE /*hinstDLL*/, DWORD fdwReason,
 	return TRUE;
 }
 #elif defined(__linux__)
+// NOLINTNEXTLINE(misc-use-internal-linkage)
 int __attribute__((constructor)) ctor() {
-	const Status ret = Extendify::runStart();
-	if (ret != OK) {
+	const Extendify::InitStatus ret = Extendify::runStart();
+	if (ret != Extendify::InitStatus::OK) {
 		Extendify::logger.error("Failed to runStart");
 	}
 	return 0;
 }
 
+// NOLINTNEXTLINE(misc-use-internal-linkage)
 int __attribute__((destructor)) dtor() {
-	const Status ret = Extendify::runStop();
-	if (ret != OK) {
+	const Extendify::InitStatus ret = Extendify::runStop();
+	if (ret != Extendify::InitStatus::OK) {
 		Extendify::logger.error("Failed to runStop");
 	}
 	return 0;
