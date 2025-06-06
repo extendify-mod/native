@@ -37,3 +37,4 @@ CheckOptions:
   readability-identifier-length.IgnoredParameterNames: "^_.*$"
   readability-identifier-length.IgnoredExceptionVariableNames: "^_.*|e$"
   readability-simplify-boolean-expr.IgnoreMacros: true
+  bugprone-unused-return-value.AllowCastToVoid: true

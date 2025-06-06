@@ -157,11 +157,7 @@ namespace Extendify::fs {
 							file.string());
 				return;
 			}
-			// https://github.com/microsoft/vscode-cpptools/issues/13644
-			// NOLINTNEXTLINE(concurrency-mt-unsafe)
-			if (std::getenv("ELECTRON_RUN_AS_NODE") != nullptr) {
-				SetEnvironmentVariableA("ELECTRON_RUN_AS_NODE", nullptr);
-			}
+			ensureFilesCanOpenInVscode();
 			// https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shellexecutew#return-value
 			// NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
 			INT_PTR ret = reinterpret_cast<INT_PTR>(
@@ -189,4 +185,14 @@ namespace Extendify::fs {
 #endif
 	};
 
+	void ensureFilesCanOpenInVscode() {
+		[[maybe_unused]] static auto _ = [] {
+			// https://github.com/microsoft/vscode-cpptools/issues/13644
+			// NOLINTNEXTLINE(concurrency-mt-unsafe)
+			if (std::getenv("ELECTRON_RUN_AS_NODE") != nullptr) {
+				SetEnvironmentVariableA("ELECTRON_RUN_AS_NODE", nullptr);
+			}
+			return 0;
+		}();
+	}
 } // namespace Extendify::fs

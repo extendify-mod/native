@@ -28,4 +28,6 @@ namespace Extendify::fs {
 	 * @param path the path to open
 	 */
 	void openPath(const std::filesystem::path& path);
+	
+	void ensureFilesCanOpenInVscode();
 } // namespace Extendify::fs

@@ -40,7 +40,12 @@ namespace Extendify::api::jsInjection {
 	}
 
 	void cleanup() {
-		logger.error("jsInjection::cleanup not implemented");
+		static volatile std::atomic_bool cleanupCalled = false;
+		if (cleanupCalled.exchange(true)) {
+			logger.warn("jsInjection::cleanup already called, ignoring");
+			return;
+		}
+		hook::unhookFunction((void*)&origFunc, (void*)hookFunc);
 	}
 
 } // namespace Extendify::api::jsInjection

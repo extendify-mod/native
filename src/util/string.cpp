@@ -43,6 +43,7 @@ namespace Extendify::util::string {
 			if (nextPos == std::string::npos) {
 				nextPos = str.size();
 				res.emplace_back(str.begin() + lastPos, str.begin() + nextPos);
+				break;
 			}
 			res.emplace_back(str.begin() + lastPos, str.begin() + nextPos);
 			lastPos = nextPos + delimiter.size();
@@ -69,20 +70,25 @@ namespace Extendify::util::string {
 		std::smatch match;
 
 		auto lastPos = str.begin();
-		std::regex_search(lastPos, str.end(), match, delimiter, opts.flags);
+		const auto doSearch = [&] {
+			std::regex_search(lastPos, str.end(), match, delimiter, opts.flags);
+		};
+		doSearch();
 
 		int curCount = 0;
-
+		if (match.position() == 0) {
+			lastPos = str.begin() + match.length();
+			doSearch();
+		} else if (match.empty()) {
+			return {str};
+		}
 		while (curCount++ != opts.limit) {
-			if (match.empty()) {
-				res.emplace_back(lastPos, str.end());
-				break;
-			}
-			res.emplace_back(lastPos, str.begin() + match.position());
-			lastPos = str.begin() + match.position() + match.length();
-			std::regex_search(lastPos, str.end(), match, delimiter, opts.flags);
-			if (match.position() + match.length() == str.size()) {
-				res.emplace_back();
+			doSearch();
+			res.emplace_back(
+				lastPos,
+				(match.empty() ? str.end() : lastPos + match.position()));
+			lastPos += match.position() + match.length();
+			if (lastPos > str.end()) {
 				break;
 			}
 		}

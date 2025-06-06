@@ -1,18 +1,28 @@
 #pragma once
+#ifdef __cplusplus
+#include "main.hpp"
+
+#include <cassert>
+#include <cstdio>
+#include <cstdlib> // IWYU pragma: keep. clang is insane, this is used for abort(). see: https://en.cppreference.com/w/cpp/utility/program/abort
+#include <stacktrace>
+
+
+#else
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#endif
 [[gnu::always_inline]] [[noreturn]] inline bool
 e_abort(const char* msg, const char* file, int line, const char* func) {
 	// NOLINTNEXTLINE
-	fprintf(stderr, "%s:%d:%s: Assertion `%s` failed.", file, line, func, msg);
+	fprintf(stderr, "%s:%d: %s: Assertion `%s` failed.", file, line, func, msg);
 	abort();
 }
 
 #ifdef _WIN32
 #define E_ASSERT(x)                                                         \
-	(void)(!!(x) || (e_abort(#x, __PRETTY_FUNCTION__, __LINE__, __func__)))
+	(void)(!!(x) || (e_abort(#x, __FILE__, __LINE__, __PRETTY_FUNCTION__)))
 #elif defined(__linux__)
 #ifdef NDEBUG
 // assert copied from assert.h
@@ -60,4 +70,15 @@ void __assert_fail(const char* __assertion, const char* __file,
 			: __assert_fail(#expr, __FILE__, __LINE__, __ASSERT_FUNCTION))
 #endif
 
+#endif
+
+#ifdef __cplusplus
+namespace Extendify::log {
+
+	[[gnu::always_inline]] void inline printStackTrace() {
+		const auto stackTrace = std::stacktrace::current();
+		Extendify::logger.error("{}", stackTrace);
+	}
+
+} // namespace Extendify::log
 #endif

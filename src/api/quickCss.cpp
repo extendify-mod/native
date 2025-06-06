@@ -22,7 +22,6 @@
 #include <optional>
 #include <string>
 
-
 namespace Extendify::api::quickCss {
 	namespace {
 		CefV8ValueList quickCssChangeListeners {};
@@ -156,6 +155,22 @@ namespace Extendify::api::quickCss {
 		});
 
 	CefRefPtr<CefV8Value> makeApi() {
+		[[maybe_unused]] static auto watcherId = [] {
+			auto ret = fs::Watcher::get()->addFile(
+				path::getQuickCssFile(),
+				[](std::unique_ptr<fs::Watcher::Event> /*event*/) {
+					logger.debug(
+						"change in quick css file; dispatching update");
+					dispatchQuickCssUpdate();
+				});
+			if (!ret) {
+				logger.error("Failed to add quick CSS file to watcher: {}",
+							 ret.error());
+				return -1;
+			}
+			return ret.value();
+		}();
+
 		CefRefPtr<CefV8Value> api = CefV8Value::CreateObject(nullptr, nullptr);
 
 		CefRefPtr<CefV8Value> getFunc =
@@ -180,17 +195,6 @@ namespace Extendify::api::quickCss {
 		CefRefPtr<CefV8Value> openEditorFunc =
 			CefV8Value::CreateFunction("openEditor", openFileHandler);
 		api->SetValue("openEditor", openEditorFunc, V8_PROPERTY_ATTRIBUTE_NONE);
-
-		static std::optional<int> watcherId = {};
-		if (!watcherId) {
-			watcherId = fs::Watcher::get()->addFile(
-				path::getQuickCssFile(),
-				[](std::unique_ptr<fs::Watcher::Event> /*event*/) {
-					logger.debug(
-						"change in quick css file; dispatching update");
-					dispatchQuickCssUpdate();
-				});
-		}
 
 		return api;
 	}

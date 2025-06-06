@@ -73,5 +73,10 @@
     "clangd.serverCompletionRanking": true,
     "clangd.fallbackFlags": [
         "--std=c++23"
-    ]
+    ],
+    "files.associations": {
+        ".clang-format": "yaml",
+        ".clang-tidy": "yaml",
+        ".clangd": "yaml"
+    }
 }

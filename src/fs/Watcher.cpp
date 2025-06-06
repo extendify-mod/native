@@ -9,12 +9,14 @@
 #include <cstring>
 #include <deque>
 #include <exception>
+#include <expected>
 #include <filesystem>
 #include <format>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <utility>
 #ifdef _WIN32
@@ -109,45 +111,66 @@ Watcher::~Watcher() {
 #endif
 }
 
-int Watcher::addFile(const std::filesystem::path& path,
-					 const Callback& callback) {
-	if (path.empty()) {
-		throw std::invalid_argument("Path cannot be empty");
-	}
-	if (callback == nullptr) {
-		throw std::invalid_argument("Callback cannot be null");
-	}
-	logger.info("Adding file to watcher: {}", path.string());
-	auto dirname = path.parent_path();
+std::expected<int, std::string>
+Watcher::addFile(const std::filesystem::path& path,
+				 const Callback& callback) noexcept {
+	try {
+		if (path.empty()) {
+			return std::unexpected("Path cannot be empty");
+		}
+		if (callback == nullptr) {
+			return std::unexpected("Callback cannot be null");
+		}
+		logger.info("Adding file to watcher: {}", path.string());
+		auto dirname = path.parent_path();
 
 #ifdef _WIN32
-	if (!dirs.contains(dirname)) {
-		dirs.emplace(dirname, std::make_unique<Dir>(dirname, onChange));
-		dirs[dirname]->watch();
-	}
+		if (!dirs.contains(dirname)) {
+			dirs.emplace(dirname, std::make_unique<Dir>(dirname, onChange));
+			dirs[dirname]->watch();
+		}
 
-	return dirs[dirname]->addFile(path, callback);
+		return dirs[dirname]->addFile(path, callback);
 #endif
-	return -1;
+	} catch (const std::exception& e) {
+		log::printStackTrace();
+		return std::unexpected(std::format("Exception: {}", e.what()));
+	} catch (...) {
+		log::printStackTrace();
+		return std::unexpected("Unknown exception occurred");
+	}
 }
 
-int Watcher::addDir(const std::filesystem::path& path,
-					const Callback& callback) {
-	if (path.empty()) {
-		throw std::invalid_argument("Path cannot be empty");
-	}
-	if (callback == nullptr) {
-		throw std::invalid_argument("Callback cannot be null");
-	}
-	logger.info("Adding directory to watcher: {}", path.string());
+std::expected<int, std::string>
+Watcher::addDir(const std::filesystem::path& path,
+				const Callback& callback) noexcept {
+	try {
+		if (path.empty()) {
+			return std::unexpected("Path cannot be empty");
+		}
+		if (callback == nullptr) {
+			return std::unexpected("Callback cannot be null");
+		}
+		if (!std::filesystem::exists(path)) {
+			return std::unexpected(
+				std::format("Directory {} does not exist", path.string()));
+		}
+		logger.info("Adding directory to watcher: {}", path.string());
 #ifdef _WIN32
-	if (!dirs.contains(path)) {
-		dirs.emplace(path, std::make_unique<Dir>(path, onChange));
-		dirs[path]->watch();
-	}
-	return dirs[path]->addDir(callback);
+		if (!dirs.contains(path)) {
+			dirs.emplace(path, std::make_unique<Dir>(path, onChange));
+			dirs[path]->watch();
+		}
+		return dirs[path]->addDir(callback);
 #endif
-	return -1;
+		return -1;
+	} catch (const std::exception& e) {
+		log::printStackTrace();
+		return std::unexpected(std::format("Exception: {}", e.what()));
+	} catch (...) {
+		log::printStackTrace();
+		return std::unexpected("Unknown exception occurred");
+	}
 }
 
 void Watcher::runLoop() {
@@ -249,7 +272,7 @@ void Watcher::Dir::watch() {
 	memset(&overlapped, 0, sizeof(overlapped));
 	if (!ReadDirectoryChangesW(baseDirHandle,
 							   buf.data(),
-							   sizeof(buf.max_size()),
+							   buf.max_size(),
 							   true,
 							   events,
 							   nullptr,

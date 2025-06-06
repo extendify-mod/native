@@ -37,7 +37,6 @@
 #include <utility>
 #include <vector>
 
-
 namespace Extendify::api::themes {
 	namespace {
 		CefV8ValueList themeChangeListeners {};
@@ -106,229 +105,242 @@ namespace Extendify::api::themes {
 			.returnType = V8Type::OBJECT | V8Type::UNDEFINED}};
 	} // namespace usage
 
-	static auto uploadThemeHandler = CBHandler::Create(
-		// NOLINTNEXTLINE(performance-unnecessary-value-param)
-		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
-		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
-		   CefString& exception) {
-			try {
-				usage::uploadTheme.validateOrThrow(arguments);
-				auto picker = fs::FilePicker::Create(
-					{.mode = fs::FilePicker::DialogType::OPEN,
-					 .title = "Select a theme file to upload",
-					 .filters = {{
-						 .displayName = "All Files",
-						 .patterns = {"*.*"},
-					 }},
-					 .defaultFilter =
-						 {
-							 .displayName = "CSS Files",
-							 .patterns = {"*.css", "*.theme.css"},
-						 },
-					 .stateId = &ids::THEMES});
-				retval = picker->promise(
-					CefV8Context::GetCurrentContext(),
-					// NOLINTNEXTLINE(performance-unnecessary-value-param)
-					[](std::shared_ptr<fs::FilePicker> /*picker*/,
-					   std::vector<std::filesystem::path>
-						   pickedPath,
-					   std::optional<std::string>
-						   error)
-						-> std::expected<CefRefPtr<CefV8Value>, std::string> {
-						if (error.has_value()) {
-							return std::unexpected(std::move(*error));
-						}
-						if (pickedPath.empty()) {
-							constexpr auto msg =
-								"No file was picked for upload";
-							logger.warn(msg);
-							return std::unexpected(msg);
-						}
-						const auto& path = pickedPath[0];
-						if (themeExists(path.filename().string())) {
-							const auto msg =
-								std::format("Theme with name {} already "
-											"exists, not uploading",
-											path.filename().string());
-							logger.error(msg);
-							return std::unexpected(msg);
-						}
-						std::filesystem::copy_file(
-							path, path::getThemesDir(true) / path.filename());
-						return CefV8Value::CreateUndefined();
-					});
-			} catch (std::exception& e) {
-				const auto msg =
-					std::format("Error uploading theme: {}", e.what());
-				logger.error(msg);
-				exception = msg;
-			}
-			return true;
-		});
-
-	static auto deleteThemeHandler = CBHandler::Create(
-		// NOLINTNEXTLINE(performance-unnecessary-value-param)
-		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
-		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
-		   CefString& exception) {
-			try {
-				usage::deleteTheme.validateOrThrow(arguments);
-				const std::filesystem::path themePath {
-					arguments[0]->GetStringValue()};
-				if (!themePath.is_absolute()) {
-					throw std::runtime_error("Theme path must be absolute");
-				}
-				if (themePath.lexically_relative(path::getThemesDir())
-						.lexically_normal()
-						.string()
-						.starts_with("..")) {
-					throw std::runtime_error(
-						"Theme path must be inside the themes directory");
-				}
-				auto msgbox = Extendify::util::MsgBox::Create(
-					"Delete Theme",
-					std::format(
-						"Are you sure you want to delete the file at: {}",
-						themePath.string()),
-					MsgBox::Type::YES_NO);
-				retval = msgbox->promise(
-					CefV8Context::GetCurrentContext(),
-					[themePath](
+	namespace {
+		auto uploadThemeHandler = CBHandler::Create(
+			// NOLINTNEXTLINE(performance-unnecessary-value-param)
+			[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
+			   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
+			   CefString& exception) {
+				try {
+					usage::uploadTheme.validateOrThrow(arguments);
+					auto picker = fs::FilePicker::Create(
+						{.mode = fs::FilePicker::DialogType::OPEN,
+						 .title = "Select a theme file to upload",
+						 .filters = {{
+							 .displayName = "All Files",
+							 .patterns = {"*.*"},
+						 }},
+						 .defaultFilter =
+							 {
+								 .displayName = "CSS Files",
+								 .patterns = {"*.css", "*.theme.css"},
+							 },
+						 .stateId = &ids::THEMES});
+					retval = picker->promise(
+						CefV8Context::GetCurrentContext(),
 						// NOLINTNEXTLINE(performance-unnecessary-value-param)
-						std::shared_ptr<Extendify::util::MsgBox> /*msgbox*/,
-						Extendify::util::MsgBox::Result res)
-						-> std::expected<CefRefPtr<CefV8Value>, std::string> {
-						if (res == Extendify::util::MsgBox::Result::OK) {
-							std::error_code errCode;
-							std::filesystem::remove(themePath, errCode);
-							if (errCode) {
+						[](std::shared_ptr<fs::FilePicker> /*picker*/,
+						   std::vector<std::filesystem::path>
+							   pickedPath,
+						   std::optional<std::string>
+							   error) -> std::expected<CefRefPtr<CefV8Value>,
+													   std::string> {
+							if (error.has_value()) {
+								return std::unexpected(std::move(*error));
+							}
+							if (pickedPath.empty()) {
+								constexpr auto msg =
+									"No file was picked for upload";
+								logger.warn(msg);
+								return std::unexpected(msg);
+							}
+							const auto& path = pickedPath[0];
+							if (themeExists(path.filename().string())) {
 								const auto msg =
-									std::format("Error deleting theme file: {}",
-												errCode.message());
+									std::format("Theme with name {} already "
+												"exists, not uploading",
+												path.filename().string());
 								logger.error(msg);
 								return std::unexpected(msg);
 							}
-							return CefV8Value::CreateBool(true);
-						}
-						if (res == Extendify::util::MsgBox::Result::CANCEL) {
-							return CefV8Value::CreateBool(false);
-						}
-						return std::unexpected(
-							"MessageBox returned an unexpected result");
-					});
-			} catch (std::exception& e) {
-				const auto msg =
-					std::format("Error deleting theme: {}", e.what());
-				logger.error(msg);
-				exception = msg;
-			}
-			return true;
-		});
-
-	static auto addChangeListenerHandler = CBHandler::Create(
-		// NOLINTNEXTLINE(performance-unnecessary-value-param)
-		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
-		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& /*retval*/,
-		   CefString& exception) {
-			try {
-				usage::addChangeListener.validateOrThrow(arguments);
-				const auto currentContext = CefV8Context::GetCurrentContext();
-				if (!themeChangeContext) {
-					themeChangeContext = currentContext;
-				} else if (!themeChangeContext->IsSame(currentContext)) {
-					logger.error("Saved theme change context is not the same "
-								 "as the entered one while "
-								 "adding a listener, invalidating all previous "
-								 "listeners and using "
-								 "the current context");
-					themeChangeListeners.clear();
-					themeChangeContext = currentContext;
+							std::filesystem::copy_file(path,
+													   path::getThemesDir(true)
+														   / path.filename());
+							return CefV8Value::CreateUndefined();
+						});
+				} catch (std::exception& e) {
+					const auto msg =
+						std::format("Error uploading theme: {}", e.what());
+					logger.error(msg);
+					exception = msg;
 				}
-				themeChangeListeners.push_back(arguments[0]);
-				logger.debug("Added theme change listener, total listeners: {}",
-							 themeChangeListeners.size());
-			} catch (std::exception& e) {
-				const auto msg = std::format(
-					"Error adding theme change listener: {}", e.what());
-				logger.error(msg);
-				exception = msg;
-			}
-			return true;
-			;
-		});
+				return true;
+			});
 
-	static auto getThemesDirHandler = CBHandler::Create(
-		// NOLINTNEXTLINE(performance-unnecessary-value-param)
-		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
-		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
-		   CefString& exception) {
-			try {
-				usage::getThemesDir.validateOrThrow(arguments);
-				const auto themesDir = path::getThemesDir();
-				retval = CefV8Value::CreateString(themesDir.string());
-			} catch (std::exception& e) {
-				const auto msg =
-					std::format("Error getting themes dir: {}", e.what());
-				logger.error(msg);
-				exception = msg;
-			}
-			return true;
-		});
-
-	static auto getThemesHandler = CBHandler::Create(
-		// NOLINTNEXTLINE(performance-unnecessary-value-param)
-		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
-		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
-		   CefString& exception) {
-			try {
-				usage::getThemes.validateOrThrow(arguments);
-				const auto themes = themeCache.getThemes();
-				const auto arr = CefV8Value::CreateArray((int)themes.size());
-				for (auto i = 0; i < themes.size(); i++) {
-					arr->SetValue(i, themes[i]->toJSON());
+		auto deleteThemeHandler = CBHandler::Create(
+			// NOLINTNEXTLINE(performance-unnecessary-value-param)
+			[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
+			   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
+			   CefString& exception) {
+				try {
+					usage::deleteTheme.validateOrThrow(arguments);
+					const std::filesystem::path themePath {
+						arguments[0]->GetStringValue()};
+					if (!themePath.is_absolute()) {
+						throw std::runtime_error("Theme path must be absolute");
+					}
+					if (themePath.lexically_relative(path::getThemesDir())
+							.lexically_normal()
+							.string()
+							.starts_with("..")) {
+						throw std::runtime_error(
+							"Theme path must be inside the themes directory");
+					}
+					auto msgbox = Extendify::util::MsgBox::Create(
+						"Delete Theme",
+						std::format(
+							"Are you sure you want to delete the file at: {}",
+							themePath.string()),
+						MsgBox::Type::YES_NO);
+					retval = msgbox->promise(
+						CefV8Context::GetCurrentContext(),
+						[themePath](
+							// NOLINTNEXTLINE(performance-unnecessary-value-param)
+							std::shared_ptr<Extendify::util::MsgBox> /*msgbox*/,
+							Extendify::util::MsgBox::Result res)
+							-> std::expected<CefRefPtr<CefV8Value>,
+											 std::string> {
+							if (res == Extendify::util::MsgBox::Result::OK) {
+								std::error_code errCode;
+								std::filesystem::remove(themePath, errCode);
+								if (errCode) {
+									const auto msg = std::format(
+										"Error deleting theme file: {}",
+										errCode.message());
+									logger.error(msg);
+									return std::unexpected(msg);
+								}
+								return CefV8Value::CreateBool(true);
+							}
+							if (res
+								== Extendify::util::MsgBox::Result::CANCEL) {
+								return CefV8Value::CreateBool(false);
+							}
+							return std::unexpected(
+								"MessageBox returned an unexpected result");
+						});
+				} catch (std::exception& e) {
+					const auto msg =
+						std::format("Error deleting theme: {}", e.what());
+					logger.error(msg);
+					exception = msg;
 				}
-				retval = arr;
-			} catch (std::exception& e) {
-				const auto msg =
-					std::format("Error getting themes: {}", e.what());
-				logger.error(msg);
-				exception = msg;
-			}
-			return true;
-			;
-		});
+				return true;
+			});
 
-	static auto getThemeDataHandler = CBHandler::Create(
-		// NOLINTNEXTLINE(performance-unnecessary-value-param)
-		[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
-		   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
-		   CefString& exception) {
-			try {
-				usage::getThemeData.validateOrThrow(arguments);
-				const auto theme =
-					themeCache.getFromFileName(arguments[0]->GetStringValue());
-				if (theme) {
-					retval = (*theme)->toJSON();
-				} else {
-					retval = CefV8Value::CreateUndefined();
+		auto addChangeListenerHandler = CBHandler::Create(
+			// NOLINTNEXTLINE(performance-unnecessary-value-param)
+			[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
+			   const CefV8ValueList& arguments,
+			   CefRefPtr<CefV8Value>& /*retval*/, CefString& exception) {
+				try {
+					usage::addChangeListener.validateOrThrow(arguments);
+					const auto currentContext =
+						CefV8Context::GetCurrentContext();
+					if (!themeChangeContext) {
+						themeChangeContext = currentContext;
+					} else if (!themeChangeContext->IsSame(currentContext)) {
+						logger.error(
+							"Saved theme change context is not the same "
+							"as the entered one while "
+							"adding a listener, invalidating all previous "
+							"listeners and using "
+							"the current context");
+						themeChangeListeners.clear();
+						themeChangeContext = currentContext;
+					}
+					themeChangeListeners.push_back(arguments[0]);
+					logger.debug(
+						"Added theme change listener, total listeners: {}",
+						themeChangeListeners.size());
+				} catch (std::exception& e) {
+					const auto msg = std::format(
+						"Error adding theme change listener: {}", e.what());
+					logger.error(msg);
+					exception = msg;
 				}
-			} catch (std::exception& e) {
-				const auto msg =
-					std::format("Error getting theme data: {}", e.what());
-				logger.error(msg);
-				exception = msg;
-			}
-			return true;
-		});
+				return true;
+				;
+			});
+
+		auto getThemesDirHandler = CBHandler::Create(
+			// NOLINTNEXTLINE(performance-unnecessary-value-param)
+			[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
+			   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
+			   CefString& exception) {
+				try {
+					usage::getThemesDir.validateOrThrow(arguments);
+					const auto themesDir = path::getThemesDir();
+					retval = CefV8Value::CreateString(themesDir.string());
+				} catch (std::exception& e) {
+					const auto msg =
+						std::format("Error getting themes dir: {}", e.what());
+					logger.error(msg);
+					exception = msg;
+				}
+				return true;
+			});
+
+		auto getThemesHandler = CBHandler::Create(
+			// NOLINTNEXTLINE(performance-unnecessary-value-param)
+			[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
+			   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
+			   CefString& exception) {
+				try {
+					usage::getThemes.validateOrThrow(arguments);
+					const auto themes = themeCache.getThemes();
+					const auto arr =
+						CefV8Value::CreateArray((int)themes.size());
+					for (auto i = 0; i < themes.size(); i++) {
+						arr->SetValue(i, themes[i]->toJSON());
+					}
+					retval = arr;
+				} catch (std::exception& e) {
+					const auto msg =
+						std::format("Error getting themes: {}", e.what());
+					logger.error(msg);
+					exception = msg;
+				}
+				return true;
+				;
+			});
+
+		auto getThemeDataHandler = CBHandler::Create(
+			// NOLINTNEXTLINE(performance-unnecessary-value-param)
+			[](const CefString& /*name*/, CefRefPtr<CefV8Value> /*object*/,
+			   const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval,
+			   CefString& exception) {
+				try {
+					usage::getThemeData.validateOrThrow(arguments);
+					const auto theme = themeCache.getFromFileName(
+						arguments[0]->GetStringValue());
+					if (theme) {
+						retval = (*theme)->toJSON();
+					} else {
+						retval = CefV8Value::CreateUndefined();
+					}
+				} catch (std::exception& e) {
+					const auto msg =
+						std::format("Error getting theme data: {}", e.what());
+					logger.error(msg);
+					exception = msg;
+				}
+				return true;
+			});
+	} // namespace
 
 	[[nodiscard]] CefRefPtr<CefV8Value> makeApi() {
 		[[maybe_unused]] const static int _ = []() {
 			themeCache.initThemes();
-			fs::Watcher::get()->addDir(
-				path::getThemesDir(),
+			auto ret = fs::Watcher::get()->addDir(
+				path::getThemesDir(true),
 				[](std::unique_ptr<fs::Watcher::Event> event) -> void {
 					themeCache.dispatchThemeUpdate(event->path);
 				});
+			if (!ret) {
+				logger.error("Failed to add themes directory to watcher: {}",
+							 ret.error());
+			}
 			return 0;
 		}();
 		CefRefPtr<CefV8Value> api = CefV8Value::CreateObject(nullptr, nullptr);
@@ -590,30 +602,23 @@ namespace Extendify::api::themes {
 		R"([^\S\r\n]*?\r?(?:\r\n|\n)[^\S\r\n]*?\*[^\S\r\n]?)"};
 	const static std::basic_regex<char> escapedAtRegex {R"(^\\@)"};
 
-	UserTheme makeHeader(const std::string& fileName,
-						 const UserTheme& previousThemeData) {
-		UserTheme theme;
-		theme.fileName = fileName;
-		if (!previousThemeData.name.empty()) {
-			theme.name = previousThemeData.name;
-		} else {
-			if (fileName.ends_with(".css")) {
-				theme.name = fileName.substr(0, fileName.size() - 4);
+	namespace {
+		UserTheme makeHeader(const std::string& fileName,
+							 const UserTheme& previousThemeData) {
+			UserTheme theme = previousThemeData;
+			theme.fileName = fileName;
+			if (!previousThemeData.name.empty()) {
+				theme.name = previousThemeData.name;
 			} else {
-				theme.name = fileName;
+				if (fileName.ends_with(".css")) {
+					theme.name = fileName.substr(0, fileName.size() - 4);
+				} else {
+					theme.name = fileName;
+				}
 			}
+			return theme;
 		}
-
-		theme.author = previousThemeData.author;
-		theme.description = previousThemeData.description;
-
-		theme.version = previousThemeData.version;
-		theme.license = previousThemeData.license;
-		theme.source = previousThemeData.source;
-		theme.website = previousThemeData.website;
-		theme.invite = previousThemeData.invite;
-		return theme;
-	}
+	} // namespace
 
 	// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 	UserTheme getThemeInfo(const std::string& css,
@@ -623,7 +628,6 @@ namespace Extendify::api::themes {
 		if (theme.content.empty()) {
 			logger.warn("making theme info for empty css with filename: {}",
 						fileName);
-			theme.content = "";
 			return makeHeader(fileName, theme);
 		}
 		std::string block;
@@ -652,7 +656,7 @@ namespace Extendify::api::themes {
 				theme.set(field, std::move(accum));
 				const auto sep = line.find(' ');
 				assert(sep != std::string::npos && "TODO: handle this");
-				field = line.substr(1, sep);
+				field = line.substr(1, sep - 1);
 				accum = line.substr(sep + 1);
 			} else {
 				std::string value = line;

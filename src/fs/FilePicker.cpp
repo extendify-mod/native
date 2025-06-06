@@ -2,6 +2,7 @@
 #include "FilePicker.hpp"
 
 #include "api/util/ScopedV8Context.hpp"
+#include "fs.hpp"
 #include "log/log.hpp"
 #include "log/Logger.hpp"
 #include "main.hpp"
@@ -430,7 +431,6 @@ namespace Extendify::fs {
 			}
 
 			HRESULT getOptions(DWORD& pFlags) {
-				E_ASSERT(pFlags && "pFlags is null");
 				E_ASSERT(this->ptr() && "FileDialog is not initialized");
 				return this->ptr()->GetOptions(&pFlags);
 			}
@@ -812,6 +812,7 @@ namespace Extendify::fs {
 		} else {
 			fileDialog = OpenDialogImpl::Create();
 		}
+		ensureFilesCanOpenInVscode();
 
 		E_CHECK_ERR(fileDialog->code);
 		// Create an event handling object, and hook it up to the dialog.

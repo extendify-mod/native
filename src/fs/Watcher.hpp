@@ -7,12 +7,14 @@
 #include <cef_thread.h>
 #include <cstdint>
 #include <deque>
+#include <expected>
 #include <filesystem>
 #include <format>
 #include <functional>
 #include <internal/cef_ptr.h>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <tuple>
 #include <unordered_map>
@@ -66,9 +68,10 @@ namespace Extendify::fs {
 		 * @return a unique, non-negative, non-zero id for this file/callback
 		 * pair, use it to remove the watcher
 		 */
-		int addFile(const std::filesystem::path& path,
-					const Callback& callback);
-		int addDir(const std::filesystem::path& path, const Callback& callback);
+		std::expected<int, std::string> addFile(const std::filesystem::path& path,
+					const Callback& callback) noexcept;
+		// dir must exist
+		std::expected<int, std::string> addDir(const std::filesystem::path& path, const Callback& callback) noexcept;
 		/**
 		 * @brief Removes a file from the watcher
 		 *

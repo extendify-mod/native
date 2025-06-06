@@ -1,5 +1,6 @@
 #include "api.hpp"
 
+#include "jsInjection.hpp"
 #include "log/Logger.hpp"
 #include "quickCss.hpp"
 #include "settings.hpp"
@@ -9,11 +10,16 @@
 #include <internal/cef_ptr.h>
 #include <internal/cef_types.h>
 
+
 namespace Extendify::api {
 	log::Logger logger({"Extendify", "api"});
 
 	void inject(const CefRefPtr<CefV8Context>& context) {
 		logger.info("Injecting ExtendifyNative API into V8 context");
+
+		logger.debug("Removing previous js hook");
+		jsInjection::cleanup();
+
 		CefRefPtr<CefV8Value> global = context->GetGlobal();
 		CefRefPtr<CefV8Value> extendify =
 			CefV8Value::CreateObject(nullptr, nullptr);
