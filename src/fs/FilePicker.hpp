@@ -67,7 +67,7 @@ namespace Extendify::fs {
 			 * SHOULD NOT BE IN @link filters
 			 */
 			FileFilter defaultFilter = {.displayName = "All Files",
-										.patterns = {"*.*"}};
+										.patterns = {"*"}};
 			ids::ExtendifyId* stateId = &ids::DEFAULT;
 		};
 
@@ -126,7 +126,6 @@ namespace Extendify::fs {
 		};
 
 		std::variant<V8Data, RawData> callbackData;
-		CefRefPtr<CefThread> pickerThread;
 
 		std::shared_ptr<FilePicker> self;
 

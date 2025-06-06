@@ -160,7 +160,7 @@ namespace Extendify::util {
 		logger.warn("Unknown return value from MessageBox: {}", ret);
 		return Result::ERR;
 #elif defined(__linux__)
-#warn "Linux support is not implemented yet"
+#warning "Linux support is not implemented yet"
 		return Result::ERR;
 #endif
 	}

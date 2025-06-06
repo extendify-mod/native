@@ -34,58 +34,66 @@
           in
           pkgs.mkShell {
             packages = with pkgs; [
-              gtkmm4
-            ];
-            LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [
-              libgcc.lib
-              nspr
-              alsa-lib
-              at-spi2-atk
-              at-spi2-core
-              atk
-              cairo
-              cups
-              dbus
-              expat
-              ffmpeg_4 # Requires libavcodec < 59 as of 1.2.9.743.g85d9593d
-              fontconfig
-              freetype
-              gdk-pixbuf
-              glib
+              pkg-config
+              gcc14
+              gtkmm3
               gtk3
-              harfbuzz
-              libayatana-appindicator
-              libdbusmenu
-              libdrm
-              libgcrypt
-              libGL
-              libnotify
-              libpng
-              libpulseaudio
-              libxkbcommon
-              libgbm
-              nss_latest
-              pango
-              stdenv.cc.cc
-              systemd
-              xorg.libICE
-              xorg.libSM
-              xorg.libX11
-              xorg.libxcb
-              xorg.libXcomposite
-              xorg.libXcursor
-              xorg.libXdamage
-              xorg.libXext
-              xorg.libXfixes
-              xorg.libXi
-              xorg.libXrandr
-              xorg.libXrender
-              xorg.libXScrnSaver
-              xorg.libxshmfence
-              xorg.libXtst
-              zlib
-              openssl
-            ]);
+              glib
+              compdb
+            ];
+            LD_LIBRARY_PATH = lib.makeLibraryPath (
+              with pkgs;
+              [
+                libgcc.lib
+                nspr
+                alsa-lib
+                at-spi2-atk
+                at-spi2-core
+                atk
+                cairo
+                cups
+                dbus
+                expat
+                ffmpeg_4 # Requires libavcodec < 59 as of 1.2.9.743.g85d9593d
+                fontconfig
+                freetype
+                gdk-pixbuf
+                glib
+                gtk3
+                harfbuzz
+                libayatana-appindicator
+                libdbusmenu
+                libdrm
+                libgcrypt
+                libGL
+                libnotify
+                libpng
+                libpulseaudio
+                libxkbcommon
+                libgbm
+                nss_latest
+                pango
+                stdenv.cc.cc
+                systemd
+                xorg.libICE
+                xorg.libSM
+                xorg.libX11
+                xorg.libxcb
+                xorg.libXcomposite
+                xorg.libXcursor
+                xorg.libXdamage
+                xorg.libXext
+                xorg.libXfixes
+                xorg.libXi
+                xorg.libXrandr
+                xorg.libXrender
+                xorg.libXScrnSaver
+                xorg.libxshmfence
+                xorg.libXtst
+                zlib
+                openssl
+              ]
+            );
             libcef_ROOT = "${libcef}";
             libcef_INCLUDE_DIR = "${libcef}/include";
             shellHook = ''

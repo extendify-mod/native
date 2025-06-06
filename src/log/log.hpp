@@ -1,14 +1,13 @@
 #pragma once
-#include <cassert>
-#include <cstdlib>
-#include <iostream>
-#include <print>
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-[[gnu::always_inline]] [[noreturn]] inline bool
+[[gnu::always_inline]] [[noreturn]] inline void
 e_abort(const char* msg, const char* file, int line, const char* func) {
-	std::println(
-		std::cerr, "{}:{}:{}: Assertion `{}` failed.", file, line, func, msg);
-	std::abort();
+	// NOLINTNEXTLINE
+	fprintf(stderr, "%s:%d:%s: Assertion `%s` failed.", file, line, func, msg);
+	abort();
 }
 
 #ifdef _WIN32
@@ -38,15 +37,27 @@ e_abort(const char* msg, const char* file, int line, const char* func) {
 #define __ASSERT_FUNCTION ((const char*)0)
 #endif
 #endif
-/* This prints an "Assertion failed" message and aborts.  */
-extern "C" void __assert_fail(const char* __assertion, const char* __file,
-							  unsigned int __line,
-							  const char* __function) __THROW
-	__attribute__((__noreturn__));
+#ifdef __cplusplus
+extern "C" {
 #endif
+/* This prints an "Assertion failed" message and aborts.  */
+void __assert_fail(const char* __assertion, const char* __file,
+				   unsigned int __line, const char* __function) __THROW
+	__attribute__((__noreturn__));
+#ifdef __cplusplus
+}
+#endif
+#endif
+#ifdef __cplusplus
 #define E_ASSERT(expr)                                                  \
 	(static_cast<bool>(expr)                                            \
 		 ? void(0)                                                      \
 		 : __assert_fail(                                               \
 			   #expr, __ASSERT_FILE, __ASSERT_LINE, __ASSERT_FUNCTION))
+#else
+#define E_ASSERT(expr)                                                     \
+	((expr) ? (void)(0)                                                    \
+			: __assert_fail(#expr, __FILE__, __LINE__, __ASSERT_FUNCTION))
+#endif
+
 #endif

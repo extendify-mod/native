@@ -128,6 +128,7 @@ int Watcher::addFile(const std::filesystem::path& path,
 
 	return dirs[dirname]->addFile(path, callback);
 #endif
+	return -1;
 }
 
 int Watcher::addDir(const std::filesystem::path& path,
@@ -139,11 +140,14 @@ int Watcher::addDir(const std::filesystem::path& path,
 		throw std::invalid_argument("Callback cannot be null");
 	}
 	logger.info("Adding directory to watcher: {}", path.string());
+#ifdef _WIN32
 	if (!dirs.contains(path)) {
 		dirs.emplace(path, std::make_unique<Dir>(path, onChange));
 		dirs[path]->watch();
 	}
 	return dirs[path]->addDir(callback);
+#endif
+	return -1;
 }
 
 void Watcher::runLoop() {

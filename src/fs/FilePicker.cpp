@@ -1,11 +1,14 @@
+
 #include "FilePicker.hpp"
 
 #include "api/util/ScopedV8Context.hpp"
+#include "fs/FileChooserDialogCtx.hpp"
 #include "log/log.hpp"
 #include "log/Logger.hpp"
 #include "main.hpp"
-#include "util/string.hpp"
+#include "util/iter.hpp"
 #include "util/TaskCBHandler.hpp"
+#include "util/util.hpp"
 
 #include <cef_task.h>
 #include <cef_thread.h>
@@ -22,6 +25,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <unordered_set>
 #include <utility>
 #include <variant>
@@ -41,15 +45,20 @@
 #include <winnt.h>
 #include <wtypesbase.h>
 
-
+#elif defined(__linux__)
+#include <glibmm.h>
+#include <glibmm/main.h>
+#include <gtkmm.h>
+#include <gtkmm/dialog.h>
+#include <gtkmm/filechooser.h>
 #endif
 
 const static Extendify::log::Logger logger {{"Extendify", "api", "FilePicker"}};
 
 namespace Extendify::fs {
-#ifdef _WIN32
 
 	namespace {
+#ifdef _WIN32
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wlanguage-extension-token"
 
@@ -514,8 +523,9 @@ namespace Extendify::fs {
 
 			COMDLG_FILTERSPEC
 			transformFilter(const FilePicker::FileFilter& filter) {
-				constexpr static auto defaultExt = L"*.*";
-				constexpr static auto defaultDisplayName = L"Unknown filter";
+				constexpr const static auto defaultExt = L"*";
+				constexpr const static auto defaultDisplayName =
+					L"Unknown filter";
 				COMDLG_FILTERSPEC spec;
 				if (filter.displayName.empty()) {
 					logger.warn("FileFilter has no display name, using "
@@ -528,8 +538,7 @@ namespace Extendify::fs {
 					spec.pszName = dialogStrings.back().c_str();
 				}
 				if (filter.patterns.empty()) {
-					logger.warn(
-						"FileFilter has no patterns, using default *.*");
+					logger.warn("FileFilter has no patterns, using default *");
 					spec.pszSpec = defaultExt;
 				} else {
 					auto str = util::string::stringToWstring(
@@ -632,141 +641,158 @@ namespace Extendify::fs {
 			}
 		};
 
-#pragma GCC diagnostic pop
 	} // namespace
-#endif
-
-	int FilePicker::nextId = 1;
-
-	FilePicker::FilePicker(FilePickerData data):
-		data(std::move(data)) {
-	}
-
-	[[nodiscard]] std::shared_ptr<FilePicker>
-	FilePicker::Create(FilePickerData data) {
-		std::shared_ptr<FilePicker> ret =
-			std::make_shared<FilePicker>(std::move(data));
-		ret->self = ret;
-		return ret;
-	}
-
-	// NOLINTNEXTLINE(performance-unnecessary-value-param)
-	[[nodiscard]] CefRefPtr<CefV8Value>
-	FilePicker::promise(const CefRefPtr<CefV8Context>& _context,
-						PromiseCallback _callback) {
-		if (isRunning()) {
-			constexpr auto msg =
-				"Trying to launch a file picker while another is "
-				"already running for the same object";
-			logger.error(msg);
-			throw std::runtime_error(msg);
-		}
-		running = true;
-		api::util::ScopedV8Context ctx(_context);
-		auto promise = CefV8Value::CreatePromise();
-		callbackData = V8Data {
-			.context = _context,
-			.promise = promise,
-			.callback = std::move(_callback),
+#pragma GCC diagnostic pop
+#elif defined(__linux__)
+		constexpr Glib::RefPtr<Gtk::FileFilter>
+		makeGtkFilter(const FilePicker::FileFilter& filter) {
+			auto gFilter = Gtk::FileFilter::create();
+			if (filter.displayName.empty()) {
+				logger.warn(
+					"FileFilter has no display name, using 'Unknown filter'");
+				gFilter->set_name("Unknown filter");
+			} else {
+				gFilter->set_name(filter.displayName);
+			}
+			if (filter.patterns.empty()) {
+				logger.warn("FileFilter has no patterns, using default *");
+				gFilter->add_pattern("*");
+			} else {
+				for (const auto& pattern : filter.patterns) {
+					gFilter->add_pattern(pattern);
+				}
+			}
+			return gFilter;
 		};
-		runFilePicker();
-		return promise;
-	}
+#endif
+} // namespace
 
-	void FilePicker::launch(Callback callback) {
-		if (isRunning()) {
-			constexpr auto msg =
-				"Trying to launch a file picker while another is "
-				"already running for the same object";
-			logger.error(msg);
-			throw std::runtime_error(msg);
-		}
-		running = true;
-		callbackData = RawData {std::move(callback)};
-		runFilePicker();
-	}
+int FilePicker::nextId = 1;
 
-	void FilePicker::runFilePicker() {
-		if (!pickerThread || !pickerThread->IsRunning()) {
-			pickerThread =
-				CefThread::CreateThread(std::format("FilePicker-{}", nextId++));
+FilePicker::FilePicker(FilePickerData data):
+	data(std::move(data)) {
+}
+
+[[nodiscard]] std::shared_ptr<FilePicker>
+FilePicker::Create(FilePickerData data) {
+	std::shared_ptr<FilePicker> ret =
+		std::make_shared<FilePicker>(std::move(data));
+	ret->self = ret;
+	return ret;
+}
+
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
+[[nodiscard]] CefRefPtr<CefV8Value>
+FilePicker::promise(const CefRefPtr<CefV8Context>& _context,
+					PromiseCallback _callback) {
+	if (isRunning()) {
+		constexpr auto msg = "Trying to launch a file picker while another is "
+							 "already running for the same object";
+		logger.error(msg);
+		throw std::runtime_error(msg);
+	}
+	running = true;
+	api::util::ScopedV8Context ctx(_context);
+	auto promise = CefV8Value::CreatePromise();
+	callbackData = V8Data {
+		.context = _context,
+		.promise = promise,
+		.callback = std::move(_callback),
+	};
+	runFilePicker();
+	return promise;
+}
+
+void FilePicker::launch(Callback callback) {
+	if (isRunning()) {
+		constexpr auto msg = "Trying to launch a file picker while another is "
+							 "already running for the same object";
+		logger.error(msg);
+		throw std::runtime_error(msg);
+	}
+	running = true;
+	callbackData = RawData {std::move(callback)};
+	runFilePicker();
+}
+
+void FilePicker::runFilePicker() {
+	std::thread([this]() {
+		auto res = showDialog();
+		std::vector<std::filesystem::path> paths;
+		std::optional<std::string> err;
+		if (res.has_value()) {
+			paths = std::move(res.value());
+		} else {
+			err = std::move(res.error());
 		}
-		pickerThread->GetTaskRunner()->PostTask(
-			util::TaskCBHandler::Create([this]() {
-				auto res = showDialog();
-				std::vector<std::filesystem::path> paths;
-				std::optional<std::string> err;
-				if (res.has_value()) {
-					paths = std::move(res.value());
-				} else {
-					err = std::move(res.error());
-				}
-				if (std::holds_alternative<V8Data>(callbackData)) {
-					CefTaskRunner::GetForThread(TID_RENDERER)
-						->PostTask(util::TaskCBHandler::Create(
-							[this,
-							 paths = std::move(paths),
-							 err = std::move(err)]() {
-								auto& v8Data = std::get<V8Data>(callbackData);
-								E_ASSERT(v8Data.context->IsValid()
-										 && "V8Context is not valid");
-								v8Data.context->GetTaskRunner()->PostTask(
-									util::TaskCBHandler::Create([&v8Data,
-																 paths,
-																 err,
-																 this]() {
-										api::util::ScopedV8Context ctx(
-											v8Data.context);
-										// keep a ref so dont drop it if the
-										// callback drops it
-										auto _ = self;
-										std::expected<CefRefPtr<CefV8Value>,
-													  std::string>
-											ret;
-										try {
-											ret = v8Data.callback(
-												std::move(self), paths, err);
-											if (ret.has_value()) {
-												v8Data.promise->ResolvePromise(
-													std::move(ret.value()));
-											} else {
-												v8Data.promise->RejectPromise(
-													ret.error());
-											}
-										} catch (const std::exception& e) {
-											logger.error(
-												"Error in file picker "
-												"callback: at {}:{}, what: {}",
-												__FILE__,
-												__LINE__,
+		if (std::holds_alternative<V8Data>(callbackData)) {
+			CefTaskRunner::GetForThread(TID_RENDERER)
+				->PostTask(util::TaskCBHandler::Create([this,
+														paths =
+															std::move(paths),
+														err =
+															std::move(err)]() {
+					auto& v8Data = std::get<V8Data>(callbackData);
+					E_ASSERT(v8Data.context->IsValid()
+							 && "V8Context is not valid");
+					v8Data.context->GetTaskRunner()->PostTask(
+						util::TaskCBHandler::Create([=, &v8Data, this]() {
+							api::util::ScopedV8Context ctx(v8Data.context);
+							// keep a ref so dont drop it if the
+							// callback drops it
+							auto _ = self;
+							std::expected<CefRefPtr<CefV8Value>, std::string>
+								ret;
+							try {
+								ret = v8Data.callback(
+									std::move(self), paths, err);
+							} catch (std::exception& e) {
+								const auto msg =
+									std::format("Error in FilePicker "
+												"promise "
+												"callback: {}",
 												e.what());
-										}
-										running = false;
-									}));
-							}));
-				} else {
-					auto& rawData = std::get<RawData>(this->callbackData);
-					// keep a ref so dont drop it if the callback
-					auto _ = self;
-					try {
-						rawData.callback(
-							std::move(self), std::move(paths), std::move(err));
-					} catch (const std::exception& e) {
-						logger.error("Error in FilePicker callback: {}",
-									 e.what());
-					}
-					running = false;
-				}
-			}));
-	}
+								logger.error(msg);
+								ret = std::unexpected(std::string(e.what()));
+							}
+							try {
+								if (ret.has_value()) {
+									v8Data.promise->ResolvePromise(
+										std::move(ret.value()));
+								} else {
+									v8Data.promise->RejectPromise(ret.error());
+								}
+							} catch (const std::exception& e) {
+								logger.error("ERROR: at {}:{}, what: {}",
+											 __FILE__,
+											 __LINE__,
+											 e.what());
+							}
+							running = false;
+						}));
+				}));
+		} else {
+			auto& rawData = std::get<RawData>(this->callbackData);
+			// keep a ref so dont drop it if the callback
+			auto _ = self;
+			try {
+				rawData.callback(
+					std::move(self), std::move(paths), std::move(err));
+			} catch (const std::exception& e) {
+				logger.error("Error in FilePicker callback: {}", e.what());
+			}
+			running = false;
+		}
+	}).detach();
+}
 
-	[[nodiscard]] std::expected<std::vector<std::filesystem::path>, std::string>
-	FilePicker::showDialog() const {
+[[nodiscard]] std::expected<std::vector<std::filesystem::path>, std::string>
+FilePicker::showDialog() const {
 #ifdef _WIN32
 #ifdef E_CHECK_ERR
 #warning "E_CHECK_ERR is already defined, redefining it"
 #endif
-		// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+	// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define E_CHECK_ERR(hr)                                                \
 	if (FAILED(hr)) {                                                  \
 		const auto msg = std::format("Error in {}. code: {}, msg: {}", \
@@ -776,113 +802,186 @@ namespace Extendify::fs {
 		logger.error(msg);                                             \
 		return std::unexpected(msg);                                   \
 	}
-		auto isSave = data.mode == DialogType::SAVE;
-		// CoCreate the File Open Dialog object.
-		std::unique_ptr<IFileDialogBase> fileDialog;
-		if (isSave) {
-			fileDialog = SaveDialogImpl::Create();
-		} else {
-			fileDialog = OpenDialogImpl::Create();
-		}
+	auto isSave = data.mode == DialogType::SAVE;
+	// CoCreate the File Open Dialog object.
+	std::unique_ptr<IFileDialogBase> fileDialog;
+	if (isSave) {
+		fileDialog = SaveDialogImpl::Create();
+	} else {
+		fileDialog = OpenDialogImpl::Create();
+	}
 
-		E_CHECK_ERR(fileDialog->code);
-		// Create an event handling object, and hook it up to the dialog.
-		auto eventsHandler = w_FileDialogEvents::Create();
-		E_CHECK_ERR(eventsHandler.code);
-		DWORD dwCookie {};
-		// Hook up the event handler.
-		HRESULT result = fileDialog->advise(eventsHandler, dwCookie);
-		E_CHECK_ERR(result);
-		// Set the options on the dialog.
-		DWORD dwFlags {};
-		// Before setting, always get the options first in order
-		// not to override existing options.
-		result = fileDialog->getOptions(dwFlags);
-		E_CHECK_ERR(result);
-		// In this case, get shell items only for file system items.
-		{
-			DWORD flags = dwFlags | FOS_FORCEFILESYSTEM;
-			flags |= FOS_OKBUTTONNEEDSINTERACTION;
-			switch (data.mode) {
-				case DialogType::OPEN: {
-					break;
-				}
-				case DialogType::OPEN_MANY: {
-					flags |= FOS_ALLOWMULTISELECT;
-					break;
-				}
-				case DialogType::OPEN_FOLDER: {
-					flags |= FOS_PICKFOLDERS;
-					break;
-				}
-				case DialogType::SAVE: {
-					flags &= ~FOS_FILEMUSTEXIST;
-				}
-				default: {
-					E_ASSERT(false && "unhandled DialogType");
-				}
+	E_CHECK_ERR(fileDialog->code);
+	// Create an event handling object, and hook it up to the dialog.
+	auto eventsHandler = w_FileDialogEvents::Create();
+	E_CHECK_ERR(eventsHandler.code);
+	DWORD dwCookie {};
+	// Hook up the event handler.
+	HRESULT result = fileDialog->advise(eventsHandler, dwCookie);
+	E_CHECK_ERR(result);
+	// Set the options on the dialog.
+	DWORD dwFlags {};
+	// Before setting, always get the options first in order
+	// not to override existing options.
+	result = fileDialog->getOptions(dwFlags);
+	E_CHECK_ERR(result);
+	// In this case, get shell items only for file system items.
+	{
+		DWORD flags = dwFlags | FOS_FORCEFILESYSTEM;
+		flags |= FOS_OKBUTTONNEEDSINTERACTION;
+		switch (data.mode) {
+			case DialogType::OPEN: {
+				break;
 			}
-			result = fileDialog->setOptions(flags);
+			case DialogType::OPEN_MANY: {
+				flags |= FOS_ALLOWMULTISELECT;
+				break;
+			}
+			case DialogType::OPEN_FOLDER: {
+				flags |= FOS_PICKFOLDERS;
+				break;
+			}
+			case DialogType::SAVE: {
+				flags &= ~FOS_FILEMUSTEXIST;
+			}
+			default: {
+				E_ASSERT(false && "unhandled DialogType");
+			}
 		}
-		E_CHECK_ERR(result);
-		// set the default file type and file types
-		result = fileDialog->setFileTypes(data);
-		E_CHECK_ERR(result);
-		// set the title
-		result = fileDialog->setTitle(data.title);
-		E_CHECK_ERR(result);
-		// set the state id
-		result = fileDialog->setStateId(data.stateId);
-		E_CHECK_ERR(result);
-		// set the default folder
-		result = fileDialog->setDefaultFolder(data.defaultFolderPath);
-		E_CHECK_ERR(result);
-		// // Set the default extension to be ".css" file.
-		// hr = fileDialog->setDefaultExtension(L"css");
-		// E_CHECK_ERR(hr);
-		// Show the dialog
-		result = fileDialog->show();
-		if (result == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
-			// user cancelled the dialog
-			return {};
-		}
-		E_CHECK_ERR(result);
-		// Obtain the result once the user clicks
-		// the 'Open' button.
-		// The result is an IShellItem object.
-		auto pickedFiles = fileDialog->getResult();
-		E_CHECK_ERR(pickedFiles->code);
-		// get the file path
-		auto paths = pickedFiles->getItems();
-		return paths;
+		result = fileDialog->setOptions(flags);
+	}
+	E_CHECK_ERR(result);
+	// set the default file type and file types
+	result = fileDialog->setFileTypes(data);
+	E_CHECK_ERR(result);
+	// set the title
+	result = fileDialog->setTitle(data.title);
+	E_CHECK_ERR(result);
+	// set the state id
+	result = fileDialog->setStateId(data.stateId);
+	E_CHECK_ERR(result);
+	// set the default folder
+	result = fileDialog->setDefaultFolder(data.defaultFolderPath);
+	E_CHECK_ERR(result);
+	// // Set the default extension to be ".css" file.
+	// hr = fileDialog->setDefaultExtension(L"css");
+	// E_CHECK_ERR(hr);
+	// Show the dialog
+	result = fileDialog->show();
+	if (result == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+		// user cancelled the dialog
+		return {};
+	}
+	E_CHECK_ERR(result);
+	// Obtain the result once the user clicks
+	// the 'Open' button.
+	// The result is an IShellItem object.
+	auto pickedFiles = fileDialog->getResult();
+	E_CHECK_ERR(pickedFiles->code);
+	// get the file path
+	auto paths = pickedFiles->getItems();
+	return paths;
 
 #undef E_CHECK_ERR
 #elif defined(__linux__)
-		return std::unexpected("Not implemented on Linux");
+		// GtkFileChooserAction gtkAction = GTK_FILE_CHOOSER_ACTION_OPEN;
+		// GtkWidget* dialog = gtk_file_chooser_dialog_new("Open Foo",
+		// 												nullptr,
+		// 												gtkAction,
+		// 												"_Cancel",
+		// 												GTK_RESPONSE_CANCEL,
+		// 												"_Foo",
+		// 												GTK_RESPONSE_ACCEPT,
+		// 												nullptr);
+		// auto ctx = Glib::MainContext::create();
+		// gtk_dialog_run_with_context(GTK_DIALOG(dialog), ctx->gobj());
+		// gtk_widget_destroy(dialog);
+		const auto action = [&] {
+			if (data.mode == DialogType::OPEN
+				|| data.mode == DialogType::OPEN_MANY) {
+				return Gtk::FILE_CHOOSER_ACTION_OPEN;
+			}
+			if (data.mode == DialogType::OPEN_FOLDER) {
+				return Gtk::FILE_CHOOSER_ACTION_SELECT_FOLDER;
+			}
+			if (data.mode == DialogType::SAVE) {
+				return Gtk::FILE_CHOOSER_ACTION_SAVE;
+			}
+			E_ASSERT(false && "unhandled DialogType");
+		}();
+		auto ctx = Glib::MainContext::create();
+
+		FileChooserDialogWithContext dialog(
+			data.title, action, Gtk::DIALOG_MODAL);
+		dialog.setContext(ctx);
+		// mode specific settings
+		if (data.mode == DialogType::OPEN_MANY) {
+			dialog.set_select_multiple(true);
+		}
+		if (data.mode == DialogType::SAVE) {
+			dialog.set_do_overwrite_confirmation(true);
+		}
+		// buttons
+		dialog.add_button("_Cancel", Gtk::RESPONSE_CANCEL);
+		if (data.mode == DialogType::OPEN || data.mode == DialogType::OPEN_MANY
+			|| data.mode == DialogType::OPEN_FOLDER) {
+			dialog.add_button("_Open", Gtk::RESPONSE_ACCEPT);
+		} else if (data.mode == DialogType::SAVE) {
+			dialog.add_button("_Save", Gtk::RESPONSE_ACCEPT);
+		} else {
+			E_ASSERT(false && "unhandled DialogType");
+		}
+		// default path
+		dialog.set_current_folder(data.defaultFolderPath);
+		// filters
+		for (const auto& filter : data.filters) {
+			dialog.add_filter(makeGtkFilter(filter));
+		}
+		// default filter
+		{
+			auto defaultFilter = makeGtkFilter(data.defaultFilter);
+			dialog.add_filter(defaultFilter);
+			dialog.set_filter(defaultFilter);
+		}
+		auto dialogResult = dialog.run();
+		if (dialogResult == Gtk::RESPONSE_CANCEL) {
+			logger.info("FilePicker dialog was cancelled by user");
+			return {};
+		}
+		if (dialogResult != Gtk::RESPONSE_ACCEPT) {
+			const auto msg = std::format(
+				"FilePicker dialog returned unexpected response: {}",
+				dialogResult);
+			logger.error(msg);
+			return std::unexpected(msg);
+		}
+		return util::iter::map(dialog.get_filenames(),
+							   util::into<std::filesystem::path>);
 #endif
-	}
+}
 
-	[[nodiscard]] std::shared_ptr<FilePicker> FilePicker::pickOne() {
-		return FilePicker::Create(FilePickerData {
-			.mode = DialogType::OPEN,
-		});
-	}
+[[nodiscard]] std::shared_ptr<FilePicker> FilePicker::pickOne() {
+	return FilePicker::Create(FilePickerData {
+		.mode = DialogType::OPEN,
+	});
+}
 
-	[[nodiscard]] std::shared_ptr<FilePicker> FilePicker::pickMany() {
-		return FilePicker::Create(FilePickerData {
-			.mode = DialogType::OPEN_MANY,
-		});
-	}
+[[nodiscard]] std::shared_ptr<FilePicker> FilePicker::pickMany() {
+	return FilePicker::Create(FilePickerData {
+		.mode = DialogType::OPEN_MANY,
+	});
+}
 
-	[[nodiscard]] std::shared_ptr<FilePicker> FilePicker::pickFolder() {
-		return FilePicker::Create(FilePickerData {
-			.mode = DialogType::OPEN_FOLDER,
-		});
-	}
+[[nodiscard]] std::shared_ptr<FilePicker> FilePicker::pickFolder() {
+	return FilePicker::Create(FilePickerData {
+		.mode = DialogType::OPEN_FOLDER,
+	});
+}
 
-	[[nodiscard]] std::shared_ptr<FilePicker> FilePicker::pickSaveFile() {
-		return FilePicker::Create(FilePickerData {
-			.mode = DialogType::SAVE,
-		});
-	}
-}; // namespace Extendify::fs
+[[nodiscard]] std::shared_ptr<FilePicker> FilePicker::pickSaveFile() {
+	return FilePicker::Create(FilePickerData {
+		.mode = DialogType::SAVE,
+	});
+}
+}
+; // namespace Extendify::fs
