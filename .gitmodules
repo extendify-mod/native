@@ -7,3 +7,6 @@
 [submodule "dobby"]
 	path = deps/dobby
 	url = https://github.com/sadan4/Dobby.git
+[submodule "extendify"]
+	path = deps/extendify
+	url = git@github.com:extendify-mod/extendify.git

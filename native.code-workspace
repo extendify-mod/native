@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "deps/wrapper"
+		},
+		{
+			"path": "deps/extendify"
 		}
 	],
 	"settings": {}
