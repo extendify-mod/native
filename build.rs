@@ -10,13 +10,13 @@ fn main() {
         .header("wrapper.h")
         .clang_arg("-I./cef")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
-        .allowlist_item("cef_v8*")
-        .allowlist_type("cef_main_args_t")
+        .allowlist_type("_cef_render_process_handler_t")
         .allowlist_type("_cef_settings_t")
+        .allowlist_type("_cef_v8_context")
         .allowlist_type("cef_app_t")
-        .allowlist_type("cef_render_process_handler_t")
         .allowlist_type("cef_browser_t")
         .allowlist_type("cef_frame_t")
+        .allowlist_type("cef_main_args_t")
         .generate()
         .expect("Unable to generate bindings");
 

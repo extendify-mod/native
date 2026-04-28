@@ -4,4 +4,6 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
+mod utils;
+
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));

@@ -17,3 +17,13 @@ pub fn log<T: Display>(msg: T) {
         writeln!(file, "{msg}").ok();
     }
 }
+
+pub fn clear_log() {
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(false)
+        .open("spotify_hook.log")
+    {
+        writeln!(file, "").ok();
+    }
+}
