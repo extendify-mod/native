@@ -44,6 +44,26 @@ pub extern "system" fn DllMain(
     0 // Returning 0 here so we don't even have to forward any calls. Might be wrong tho.
 }
 
+macro_rules! define_hook {
+    ($symbol:expr, $hook:expr, $original:expr) => {
+        unsafe {
+            match MinHook::create_hook_api("libcef.dll", $symbol, $hook as _) {
+                Ok(original) => {
+                    $original = Some(std::mem::transmute(original));
+                    log(format!("Created {} hook", stringify!($symbol)));
+                }
+                Err(e) => {
+                    log(format!(
+                        "Couldn't create {} hook {}",
+                        stringify!($symbol),
+                        e
+                    ));
+                }
+            }
+        }
+    };
+}
+
 type CefInitializeFn = unsafe extern "C" fn(
     *const cef_main_args_t,
     *mut _cef_settings_t,
@@ -56,15 +76,9 @@ type CefProcessFn =
     unsafe extern "C" fn(*const cef_main_args_t, *mut cef_app_t, *mut c_void) -> c_int;
 static mut CEF_PROCESS_OG: Option<CefProcessFn> = None;
 
-type OnContextCreatedFn = unsafe extern "C" fn(
-    *mut cef_render_process_handler_t,
-    *mut cef_browser_t,
-    *mut cef_frame_t,
-    *mut _cef_v8_context_t,
-);
-static mut ON_CONTEXT_CREATED_OG: Option<OnContextCreatedFn> = None;
-
 fn init_hooks() {
+    log("Force-loading CEF");
+
     let name: Vec<u16> = "libcef.dll"
         .encode_utf16()
         .chain(std::iter::once(0))
@@ -73,61 +87,12 @@ fn init_hooks() {
 
     log("Initializing hooks");
 
-    unsafe {
-        match MinHook::create_hook_api("libcef.dll", "cef_initialize", cef_initialize_hook as _) {
-            Ok(original) => {
-                CEF_INITIALIZE_OG = Some(std::mem::transmute(original));
-                log("Created cef_initialize hook");
-            }
-            Err(e) => {
-                log(format!("Couldn't create cef_initialize hook {e}"));
-            }
-        }
-        match MinHook::create_hook_api("libcef.dll", "cef_execute_process", cef_process_hook as _) {
-            Ok(original) => {
-                CEF_PROCESS_OG = Some(std::mem::transmute(original));
-                log("Created cef process hook");
-            }
-            Err(e) => {
-                log(format!("Couldn't create cef process hook {e}"));
-            }
-        }
+    define_hook!("cef_initialize", cef_initialize_hook, CEF_INITIALIZE_OG);
+    define_hook!("cef_execute_process", cef_process_hook, CEF_PROCESS_OG);
 
+    unsafe {
         if let Err(e) = MinHook::enable_all_hooks() {
             log(format!("Couldn't enable hooks {e}"));
-        }
-    }
-}
-
-fn create_context_hook(app: *mut cef_app_t) {
-    if app.is_null() {
-        return;
-    }
-
-    unsafe {
-        let rph = (*app).get_render_process_handler.unwrap()(app);
-        if rph.is_null() {
-            return;
-        }
-
-        log(format!("RPH found on PID {}", std::process::id()));
-
-        if let Some(og) = (*rph).on_context_created {
-            match MinHook::create_hook(og as _, on_context_created_hook as _) {
-                Ok(original) => {
-                    ON_CONTEXT_CREATED_OG = Some(std::mem::transmute(original));
-                    log("Created on_context_created hook");
-                }
-                Err(e) => {
-                    log(format!("Failed to hook on_context_created {e}"));
-                }
-            }
-
-            if let Err(e) = MinHook::enable_hook(og as _) {
-                log(format!("Couldn't enable on_context_created hook {e}"));
-            }
-        } else {
-            log("No event set");
         }
     }
 }
@@ -141,8 +106,6 @@ unsafe extern "C" fn cef_initialize_hook(
     log(format!("CEF init call on PID {}", std::process::id()));
 
     unsafe {
-        create_context_hook(app);
-
         crate::callbacks::on_entrypoint(settings);
 
         if let Some(func) = CEF_INITIALIZE_OG {
@@ -162,8 +125,6 @@ unsafe extern "C" fn cef_process_hook(
     log(format!("Executing process on PID {}", std::process::id()));
 
     unsafe {
-        create_context_hook(app);
-
         if let Some(func) = CEF_PROCESS_OG {
             return func(args, app, sandbox);
         }
@@ -171,22 +132,4 @@ unsafe extern "C" fn cef_process_hook(
 
     log("Couldn't call original cef process");
     0
-}
-
-unsafe extern "C" fn on_context_created_hook(
-    self_: *mut cef_render_process_handler_t,
-    browser: *mut cef_browser_t,
-    frame: *mut cef_frame_t,
-    context: *mut _cef_v8_context_t,
-) {
-    log(format!("Found context on PID {}", std::process::id()));
-    crate::callbacks::on_context(context);
-
-    unsafe {
-        if let Some(func) = ON_CONTEXT_CREATED_OG {
-            return func(self_, browser, frame, context);
-        }
-    }
-
-    log("Couldn't call original on_context_created");
 }
