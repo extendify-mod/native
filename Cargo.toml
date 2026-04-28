@@ -19,6 +19,7 @@ windows-sys = {
 minhook = "0.9.0"
 
 [dependencies]
+ureq = "3.3.0"
 
 [build-dependencies]
 bindgen = "0.71.0"

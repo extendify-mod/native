@@ -1,6 +1,7 @@
 use crate::cef::{
-    _cef_render_process_handler_t, _cef_settings_t, _cef_v8_context_t, cef_app_t, cef_browser_t,
-    cef_frame_t, cef_main_args_t,
+    _cef_render_process_handler_t, _cef_request_context_handler_t, _cef_request_t,
+    _cef_resource_request_handler_t, _cef_settings_t, _cef_v8_context_t, cef_app_t, cef_browser_t,
+    cef_frame_t, cef_main_args_t, cef_string_t,
 };
 use minhook::MinHook;
 use std::ffi::{c_int, c_void};
@@ -68,11 +69,9 @@ static mut CEF_INITIALIZE_OG: Option<
         *mut c_void,
     ) -> c_int,
 > = None;
-
 static mut CEF_PROCESS_OG: Option<
     unsafe extern "C" fn(*const cef_main_args_t, *mut cef_app_t, *mut c_void) -> c_int,
 > = None;
-
 static mut ON_CONTEXT_CREATED_OG: Option<
     unsafe extern "C" fn(
         *mut _cef_render_process_handler_t,
@@ -158,10 +157,27 @@ unsafe extern "C" fn cef_process_hook(
                     }
 
                     if let Err(e) = MinHook::enable_hook(og as _) {
-                        log(format!("Couldn't enable on_context_created hook {e}"));
+                        log(format!("couldn't enable on_context_created hook {e}"));
                     }
                 }
             }
+
+            //let bph = (*app).get_browser_process_handler.unwrap()(app);
+            //log("bph");
+            //let client = (*bph).get_default_client.unwrap()(bph);
+            //log("client");
+            //if let Some(get_request_handler) = (*client).get_request_handler {
+            //    let req_handler = get_request_handler(client);
+            //    log("req handler");
+            //    let og = (*req_handler).get_resource_request_handler.unwrap();
+            //    log("og");
+
+            //    if let Ok(original) = MinHook::create_hook(og as _, res_handler_hook as _) {
+            //        RES_HANDLER_OG = std::mem::transmute(original);
+            //        log("Created res handler hook");
+            //    }
+            //    let _ = MinHook::enable_hook(og as _);
+            //}
         }
 
         if let Some(func) = CEF_PROCESS_OG {
@@ -190,4 +206,47 @@ unsafe extern "C" fn on_context_created_hook(
     }
 
     log("Couldn't call original on_context_created");
+}
+
+static mut RES_HANDLER_OG: Option<
+    unsafe extern "C" fn(
+        *mut _cef_request_context_handler_t,
+        *mut cef_browser_t,
+        *mut cef_frame_t,
+        *mut _cef_request_t,
+        c_int,
+        c_int,
+        *const cef_string_t,
+        *mut c_int,
+    ) -> *mut _cef_resource_request_handler_t,
+> = None;
+unsafe extern "C" fn res_handler_hook(
+    self_: *mut _cef_request_context_handler_t,
+    browser: *mut cef_browser_t,
+    frame: *mut cef_frame_t,
+    request: *mut _cef_request_t,
+    is_navigation: c_int,
+    is_download: c_int,
+    initiator: *const cef_string_t,
+    disable_default_handling: *mut c_int,
+) -> *mut _cef_resource_request_handler_t {
+    log("!!!!!!!!!!!!!!! RES HANDLER CALLED!");
+
+    unsafe {
+        if let Some(func) = RES_HANDLER_OG {
+            return func(
+                self_,
+                browser,
+                frame,
+                request,
+                is_navigation,
+                is_download,
+                initiator,
+                disable_default_handling,
+            );
+        }
+    }
+
+    log("Couldn't call original res handler");
+    std::ptr::null_mut()
 }
