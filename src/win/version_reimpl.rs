@@ -4,11 +4,6 @@ use windows_sys::Win32::Foundation::FARPROC;
 use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 use windows_sys::core::{BOOL, PCWSTR};
 
-type GetFileVersionInfoSizeFn = unsafe extern "system" fn(PCWSTR, *mut u32) -> u32;
-type GetFileVersionInfoFn = unsafe extern "system" fn(PCWSTR, u32, u32, *mut c_void) -> BOOL;
-type VerQueryValueFn =
-    unsafe extern "system" fn(*const c_void, PCWSTR, *mut *mut c_void, *mut u32) -> BOOL;
-
 fn get_function(name: &[u8]) -> FARPROC {
     let dll_name: Vec<u16> = "C:\\Windows\\System32\\version.dll"
         .encode_utf16()
@@ -26,51 +21,28 @@ fn get_function(name: &[u8]) -> FARPROC {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "system" fn GetFileVersionInfoSizeW(filename: PCWSTR, handle: *mut u32) -> u32 {
-    unsafe {
-        if let Some(func) = get_function(b"GetFileVersionInfoSizeW\0") {
-            let callable: GetFileVersionInfoSizeFn = std::mem::transmute(func);
-            return callable(filename, handle);
-        }
+macro_rules! proxy {
+    (
+        fn $name:ident($($arg:ident: $ty:ty),*) -> $ret:ty
+    ) => {
+        #[unsafe(no_mangle)]
+        pub extern "system" fn $name($($arg: $ty),*) -> $ret {
+            unsafe {
+                if let Some(func) = get_function(concat!(stringify!($name), "\0").as_bytes()) {
+                    let callable: unsafe extern "system" fn($($ty),*) -> $ret = std::mem::transmute(func);
+                    log(format!("Forwarded {}", stringify!($name)));
+                    return callable($($arg),*);
+                }
 
-        log("DLL not loaded");
-        0
-    }
+                log("DLL not loaded");
+                Default::default()
+            }
+        }
+    };
 }
 
-#[unsafe(no_mangle)]
-pub extern "system" fn GetFileVersionInfoW(
-    filename: PCWSTR,
-    handle: u32,
-    len: u32,
-    data: *mut c_void,
-) -> BOOL {
-    unsafe {
-        if let Some(func) = get_function(b"GetFileVersionInfoW\0") {
-            let callable: GetFileVersionInfoFn = std::mem::transmute(func);
-            return callable(filename, handle, len, data);
-        }
+proxy!(fn GetFileVersionInfoSizeW(filename: PCWSTR, handle: *mut u32) -> u32);
 
-        log("DLL not loaded");
-        0
-    }
-}
+proxy!(fn GetFileVersionInfoW(filename: PCWSTR, handle: u32, len: u32, data: *mut c_void) -> BOOL);
 
-#[unsafe(no_mangle)]
-pub extern "system" fn VerQueryValueW(
-    pblock: *const c_void,
-    sub_block: PCWSTR,
-    buffer: *mut *mut c_void,
-    len: *mut u32,
-) -> BOOL {
-    unsafe {
-        if let Some(func) = get_function(b"VerQueryValueW\0") {
-            let callable: VerQueryValueFn = std::mem::transmute(func);
-            return callable(pblock, sub_block, buffer, len);
-        }
-
-        log("DLL not loaded");
-        0
-    }
-}
+proxy!(fn VerQueryValueW(pblock: *const c_void, sub_block: PCWSTR, buffer: *mut *mut c_void, len: *mut u32) -> BOOL);
