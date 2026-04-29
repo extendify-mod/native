@@ -1,30 +1,19 @@
+use crate::cef::utils::{ctos, stoc};
 use crate::cef::{
-    _cef_render_process_handler_t, _cef_request_context_handler_t, _cef_request_t,
-    _cef_resource_request_handler_t, _cef_settings_t, _cef_v8_context_t, cef_app_t, cef_browser_t,
-    cef_frame_t, cef_main_args_t, cef_string_t,
+    _cef_browser_settings_t, _cef_browser_view_delegate_t, _cef_client_t, _cef_dictionary_value_t,
+    _cef_render_process_handler_t, _cef_request_context_handler_t, _cef_request_context_t,
+    _cef_request_t, _cef_resource_request_handler_t, _cef_settings_t, _cef_v8_context_t, cef_app_t,
+    cef_browser_t, cef_browser_view_t, cef_frame_t, cef_main_args_t, cef_string_t,
 };
+use crate::log;
 use minhook::MinHook;
 use std::ffi::{c_int, c_void};
-use std::fmt::Display;
 use windows_sys::Win32::Foundation::HINSTANCE;
-use windows_sys::Win32::System::Diagnostics::Debug::OutputDebugStringA;
 use windows_sys::Win32::System::LibraryLoader::LoadLibraryW;
 use windows_sys::Win32::System::SystemServices::{DLL_PROCESS_ATTACH, DLL_PROCESS_DETACH};
 use windows_sys::core::BOOL;
 
 mod version_reimpl;
-
-// You have to use smth like DebugView to see the logs
-// because the renderer is sandboxed so we can't
-// write to the log file from that process.
-fn log<T: Display>(msg: T) {
-    crate::log(&msg);
-
-    let s = format!("{}\0", msg);
-    unsafe {
-        OutputDebugStringA(s.as_ptr());
-    }
-}
 
 #[unsafe(no_mangle)]
 pub extern "system" fn DllMain(
@@ -61,26 +50,6 @@ macro_rules! define_hook {
     };
 }
 
-static mut CEF_INITIALIZE_OG: Option<
-    unsafe extern "C" fn(
-        *const cef_main_args_t,
-        *mut _cef_settings_t,
-        *mut cef_app_t,
-        *mut c_void,
-    ) -> c_int,
-> = None;
-static mut CEF_PROCESS_OG: Option<
-    unsafe extern "C" fn(*const cef_main_args_t, *mut cef_app_t, *mut c_void) -> c_int,
-> = None;
-static mut ON_CONTEXT_CREATED_OG: Option<
-    unsafe extern "C" fn(
-        *mut _cef_render_process_handler_t,
-        *mut cef_browser_t,
-        *mut cef_frame_t,
-        *mut _cef_v8_context_t,
-    ),
-> = None;
-
 fn init_hooks() {
     log("Force-loading CEF");
 
@@ -94,6 +63,7 @@ fn init_hooks() {
 
     define_hook!("cef_initialize", cef_initialize_hook, CEF_INITIALIZE_OG);
     define_hook!("cef_execute_process", cef_process_hook, CEF_PROCESS_OG);
+    define_hook!("cef_browser_view_create", cef_view_hook, CEF_VIEW_OG);
 
     unsafe {
         if let Err(e) = MinHook::enable_all_hooks() {
@@ -114,6 +84,14 @@ fn deinit_hooks() {
     }
 }
 
+static mut CEF_INITIALIZE_OG: Option<
+    unsafe extern "C" fn(
+        *const cef_main_args_t,
+        *mut _cef_settings_t,
+        *mut cef_app_t,
+        *mut c_void,
+    ) -> c_int,
+> = None;
 unsafe extern "C" fn cef_initialize_hook(
     args: *const cef_main_args_t,
     settings: *mut _cef_settings_t,
@@ -122,9 +100,9 @@ unsafe extern "C" fn cef_initialize_hook(
 ) -> c_int {
     log(format!("CEF init call on PID {}", std::process::id()));
 
-    unsafe {
-        crate::callbacks::on_entrypoint(settings);
+    crate::callbacks::on_entrypoint(settings);
 
+    unsafe {
         if let Some(func) = CEF_INITIALIZE_OG {
             return func(args, settings, app, std::ptr::null_mut());
         }
@@ -134,6 +112,9 @@ unsafe extern "C" fn cef_initialize_hook(
     0
 }
 
+static mut CEF_PROCESS_OG: Option<
+    unsafe extern "C" fn(*const cef_main_args_t, *mut cef_app_t, *mut c_void) -> c_int,
+> = None;
 unsafe extern "C" fn cef_process_hook(
     args: *const cef_main_args_t,
     app: *mut cef_app_t,
@@ -161,23 +142,6 @@ unsafe extern "C" fn cef_process_hook(
                     }
                 }
             }
-
-            //let bph = (*app).get_browser_process_handler.unwrap()(app);
-            //log("bph");
-            //let client = (*bph).get_default_client.unwrap()(bph);
-            //log("client");
-            //if let Some(get_request_handler) = (*client).get_request_handler {
-            //    let req_handler = get_request_handler(client);
-            //    log("req handler");
-            //    let og = (*req_handler).get_resource_request_handler.unwrap();
-            //    log("og");
-
-            //    if let Ok(original) = MinHook::create_hook(og as _, res_handler_hook as _) {
-            //        RES_HANDLER_OG = std::mem::transmute(original);
-            //        log("Created res handler hook");
-            //    }
-            //    let _ = MinHook::enable_hook(og as _);
-            //}
         }
 
         if let Some(func) = CEF_PROCESS_OG {
@@ -189,6 +153,14 @@ unsafe extern "C" fn cef_process_hook(
     0
 }
 
+static mut ON_CONTEXT_CREATED_OG: Option<
+    unsafe extern "C" fn(
+        *mut _cef_render_process_handler_t,
+        *mut cef_browser_t,
+        *mut cef_frame_t,
+        *mut _cef_v8_context_t,
+    ),
+> = None;
 unsafe extern "C" fn on_context_created_hook(
     self_: *mut _cef_render_process_handler_t,
     browser: *mut cef_browser_t,
@@ -206,6 +178,43 @@ unsafe extern "C" fn on_context_created_hook(
     }
 
     log("Couldn't call original on_context_created");
+}
+
+static mut CEF_VIEW_OG: Option<
+    unsafe extern "C" fn(
+        *mut _cef_client_t,
+        *const cef_string_t,
+        *const _cef_browser_settings_t,
+        *mut _cef_dictionary_value_t,
+        *mut _cef_request_context_t,
+        *mut _cef_browser_view_delegate_t,
+    ) -> *mut cef_browser_view_t,
+> = None;
+unsafe extern "C" fn cef_view_hook(
+    client: *mut _cef_client_t,
+    url: *const cef_string_t,
+    settings: *const _cef_browser_settings_t,
+    extra_info: *mut _cef_dictionary_value_t,
+    request_context: *mut _cef_request_context_t,
+    delegate: *mut _cef_browser_view_delegate_t,
+) -> *mut cef_browser_view_t {
+    unsafe {
+        let req_handler = (*client).get_request_handler.unwrap()(client);
+        let og = (*req_handler).get_resource_request_handler.unwrap();
+
+        if let Ok(original) = MinHook::create_hook(og as _, res_handler_hook as _) {
+            RES_HANDLER_OG = std::mem::transmute(original);
+            log("Created res handler hook");
+        }
+        let _ = MinHook::enable_hook(og as _);
+
+        if let Some(func) = CEF_VIEW_OG {
+            return func(client, url, settings, extra_info, request_context, delegate);
+        }
+    }
+
+    log("Couldn't call original view");
+    std::ptr::null_mut()
 }
 
 static mut RES_HANDLER_OG: Option<
@@ -230,9 +239,16 @@ unsafe extern "C" fn res_handler_hook(
     initiator: *const cef_string_t,
     disable_default_handling: *mut c_int,
 ) -> *mut _cef_resource_request_handler_t {
-    log("!!!!!!!!!!!!!!! RES HANDLER CALLED!");
-
     unsafe {
+        let url = ctos((*request).get_url.unwrap()(request));
+        if url.ends_with("/xpui.js") || url.ends_with("/xpui-snapshot.js") {
+            let header = (*request).get_header_by_name.unwrap()(request, stoc("extendify"));
+            if header.is_null() {
+                log("Blocked entrypoint");
+                return std::ptr::null_mut();
+            }
+        }
+
         if let Some(func) = RES_HANDLER_OG {
             return func(
                 self_,

@@ -17,6 +17,8 @@ fn main() {
         .allowlist_type("cef_browser_t")
         .allowlist_type("cef_frame_t")
         .allowlist_type("cef_main_args_t")
+        .allowlist_type("_cef_browser_view_delegate_t")
+        .allowlist_type("cef_browser_view_t")
         .generate()
         .expect("Unable to generate bindings");
 

@@ -12,8 +12,6 @@ windows-sys = {
         "Win32_System",
         "Win32_System_SystemServices",
         "Win32_System_LibraryLoader",
-        "Win32_System_Diagnostics",
-        "Win32_System_Diagnostics_Debug",
     ]
 }
 minhook = "0.9.0"
