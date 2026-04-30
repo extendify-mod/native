@@ -1,5 +1,5 @@
 use crate::cef::utils::stoc;
-use crate::cef::{_cef_settings_t, _cef_v8_context_t};
+use crate::cef::{_cef_frame_t, _cef_settings_t};
 use crate::log;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use ureq;
@@ -20,17 +20,14 @@ pub fn on_entrypoint(settings: *mut _cef_settings_t) {
 
 static INJECTED: AtomicBool = AtomicBool::new(false);
 
-pub fn on_context(context: *mut _cef_v8_context_t) {
+pub fn on_frame(frame: *mut _cef_frame_t) {
     if INJECTED.load(Relaxed) {
         return;
     }
 
-    log("Creating global Extendify");
+    log("Injecting Extendify");
 
     unsafe {
-        (*context).enter.unwrap()(context);
-        let frame = (*context).get_frame.unwrap()(context);
-
         if let Some(script) = get(SCRIPT_URL) {
             (*frame).execute_java_script.unwrap()(frame, stoc(script), stoc("extendify_script"), 0);
 
@@ -47,8 +44,6 @@ pub fn on_context(context: *mut _cef_v8_context_t) {
 
             log("Injected styles");
         }
-
-        (*context).exit.unwrap()(context);
     }
 
     INJECTED.store(true, Relaxed);

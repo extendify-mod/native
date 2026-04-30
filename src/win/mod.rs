@@ -153,33 +153,6 @@ unsafe extern "C" fn cef_process_hook(
     0
 }
 
-static mut ON_CONTEXT_CREATED_OG: Option<
-    unsafe extern "C" fn(
-        *mut _cef_render_process_handler_t,
-        *mut cef_browser_t,
-        *mut cef_frame_t,
-        *mut _cef_v8_context_t,
-    ),
-> = None;
-unsafe extern "C" fn on_context_created_hook(
-    self_: *mut _cef_render_process_handler_t,
-    browser: *mut cef_browser_t,
-    frame: *mut cef_frame_t,
-    context: *mut _cef_v8_context_t,
-) {
-    log(format!("Context created on PID {}", std::process::id()));
-
-    crate::callbacks::on_context(context);
-
-    unsafe {
-        if let Some(func) = ON_CONTEXT_CREATED_OG {
-            return func(self_, browser, frame, context);
-        }
-    }
-
-    log("Couldn't call original on_context_created");
-}
-
 static mut CEF_VIEW_OG: Option<
     unsafe extern "C" fn(
         *mut _cef_client_t,
@@ -214,55 +187,5 @@ unsafe extern "C" fn cef_view_hook(
     }
 
     log("Couldn't call original view");
-    std::ptr::null_mut()
-}
-
-static mut RES_HANDLER_OG: Option<
-    unsafe extern "C" fn(
-        *mut _cef_request_context_handler_t,
-        *mut cef_browser_t,
-        *mut cef_frame_t,
-        *mut _cef_request_t,
-        c_int,
-        c_int,
-        *const cef_string_t,
-        *mut c_int,
-    ) -> *mut _cef_resource_request_handler_t,
-> = None;
-unsafe extern "C" fn res_handler_hook(
-    self_: *mut _cef_request_context_handler_t,
-    browser: *mut cef_browser_t,
-    frame: *mut cef_frame_t,
-    request: *mut _cef_request_t,
-    is_navigation: c_int,
-    is_download: c_int,
-    initiator: *const cef_string_t,
-    disable_default_handling: *mut c_int,
-) -> *mut _cef_resource_request_handler_t {
-    unsafe {
-        let url = ctos((*request).get_url.unwrap()(request));
-        if url.ends_with("/xpui.js") || url.ends_with("/xpui-snapshot.js") {
-            let header = (*request).get_header_by_name.unwrap()(request, stoc("extendify"));
-            if header.is_null() {
-                log("Blocked entrypoint");
-                return std::ptr::null_mut();
-            }
-        }
-
-        if let Some(func) = RES_HANDLER_OG {
-            return func(
-                self_,
-                browser,
-                frame,
-                request,
-                is_navigation,
-                is_download,
-                initiator,
-                disable_default_handling,
-            );
-        }
-    }
-
-    log("Couldn't call original res handler");
     std::ptr::null_mut()
 }

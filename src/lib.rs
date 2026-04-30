@@ -4,11 +4,16 @@ use std::io::Write;
 
 mod callbacks;
 mod cef;
+mod vtable_hooks;
 
+#[cfg(target_os = "linux")]
+mod linux;
 #[cfg(target_os = "windows")]
 mod win;
 
 pub fn log<T: Display>(msg: T) {
+    println!("{msg}");
+
     if let Ok(mut file) = OpenOptions::new()
         .create(true)
         .append(true)
