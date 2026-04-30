@@ -1,11 +1,10 @@
-use crate::cef::utils::{ctos, stoc};
 use crate::cef::{
-    _cef_browser_settings_t, _cef_browser_view_delegate_t, _cef_client_t, _cef_dictionary_value_t,
-    _cef_render_process_handler_t, _cef_request_context_handler_t, _cef_request_context_t,
-    _cef_request_t, _cef_resource_request_handler_t, _cef_settings_t, _cef_v8_context_t, cef_app_t,
-    cef_browser_t, cef_browser_view_t, cef_frame_t, cef_main_args_t, cef_string_t,
+    _cef_app_t, _cef_browser_settings_t, _cef_browser_view_delegate_t, _cef_browser_view_t,
+    _cef_client_t, _cef_dictionary_value_t, _cef_main_args_t, _cef_request_context_t,
+    _cef_settings_t, cef_string_t,
 };
 use crate::log;
+use crate::vtable_hooks;
 use minhook::MinHook;
 use std::ffi::{c_int, c_void};
 use windows_sys::Win32::Foundation::HINSTANCE;
@@ -86,16 +85,16 @@ fn deinit_hooks() {
 
 static mut CEF_INITIALIZE_OG: Option<
     unsafe extern "C" fn(
-        *const cef_main_args_t,
+        *const _cef_main_args_t,
         *mut _cef_settings_t,
-        *mut cef_app_t,
+        *mut _cef_app_t,
         *mut c_void,
     ) -> c_int,
 > = None;
 unsafe extern "C" fn cef_initialize_hook(
-    args: *const cef_main_args_t,
+    args: *const _cef_main_args_t,
     settings: *mut _cef_settings_t,
-    app: *mut cef_app_t,
+    app: *mut _cef_app_t,
     _sandbox: *mut c_void,
 ) -> c_int {
     log(format!("CEF init call on PID {}", std::process::id()));
@@ -113,11 +112,11 @@ unsafe extern "C" fn cef_initialize_hook(
 }
 
 static mut CEF_PROCESS_OG: Option<
-    unsafe extern "C" fn(*const cef_main_args_t, *mut cef_app_t, *mut c_void) -> c_int,
+    unsafe extern "C" fn(*const _cef_main_args_t, *mut _cef_app_t, *mut c_void) -> c_int,
 > = None;
 unsafe extern "C" fn cef_process_hook(
-    args: *const cef_main_args_t,
-    app: *mut cef_app_t,
+    args: *const _cef_main_args_t,
+    app: *mut _cef_app_t,
     _sandbox: *mut c_void,
 ) -> c_int {
     log(format!("Executing process on PID {}", std::process::id()));
@@ -127,9 +126,11 @@ unsafe extern "C" fn cef_process_hook(
             let rph = (*app).get_render_process_handler.unwrap()(app);
             if !rph.is_null() {
                 if let Some(og) = (*rph).on_context_created {
-                    match MinHook::create_hook(og as _, on_context_created_hook as _) {
+                    match MinHook::create_hook(og as _, vtable_hooks::on_context_created_hook as _)
+                    {
                         Ok(original) => {
-                            ON_CONTEXT_CREATED_OG = Some(std::mem::transmute(original));
+                            vtable_hooks::ON_CONTEXT_CREATED_OG =
+                                Some(std::mem::transmute(original));
                             log("Created on_context_created hook");
                         }
                         Err(e) => {
@@ -161,7 +162,7 @@ static mut CEF_VIEW_OG: Option<
         *mut _cef_dictionary_value_t,
         *mut _cef_request_context_t,
         *mut _cef_browser_view_delegate_t,
-    ) -> *mut cef_browser_view_t,
+    ) -> *mut _cef_browser_view_t,
 > = None;
 unsafe extern "C" fn cef_view_hook(
     client: *mut _cef_client_t,
@@ -170,13 +171,13 @@ unsafe extern "C" fn cef_view_hook(
     extra_info: *mut _cef_dictionary_value_t,
     request_context: *mut _cef_request_context_t,
     delegate: *mut _cef_browser_view_delegate_t,
-) -> *mut cef_browser_view_t {
+) -> *mut _cef_browser_view_t {
     unsafe {
         let req_handler = (*client).get_request_handler.unwrap()(client);
         let og = (*req_handler).get_resource_request_handler.unwrap();
 
-        if let Ok(original) = MinHook::create_hook(og as _, res_handler_hook as _) {
-            RES_HANDLER_OG = std::mem::transmute(original);
+        if let Ok(original) = MinHook::create_hook(og as _, vtable_hooks::res_handler_hook as _) {
+            vtable_hooks::RES_HANDLER_OG = std::mem::transmute(original);
             log("Created res handler hook");
         }
         let _ = MinHook::enable_hook(og as _);

@@ -89,9 +89,11 @@ pub unsafe extern "C" fn res_handler_hook(
     std::ptr::null_mut()
 }
 
+#[allow(unused)]
 pub static mut GET_REQ_HANDLER_OG: Option<
     unsafe extern "C" fn(*mut _cef_client_t) -> *mut _cef_request_handler_t,
 > = None;
+#[allow(unused)]
 pub unsafe extern "C" fn get_req_handler_hook(
     self_: *mut _cef_client_t,
 ) -> *mut _cef_request_handler_t {
