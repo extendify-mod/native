@@ -3,8 +3,7 @@ use crate::cef::{
     _cef_client_t, _cef_dictionary_value_t, _cef_main_args_t, _cef_request_context_t,
     _cef_settings_t, cef_string_t,
 };
-use crate::log;
-use crate::vtable_hooks;
+use crate::{log, vtable_hooks};
 use minhook::MinHook;
 use std::ffi::{c_int, c_void};
 use windows_sys::Win32::Foundation::HINSTANCE;

@@ -14,6 +14,7 @@ mod win;
 pub fn log<T: Display>(msg: T) {
     println!("{msg}");
 
+    #[cfg(debug_assertions)]
     if let Ok(mut file) = OpenOptions::new()
         .create(true)
         .append(true)
